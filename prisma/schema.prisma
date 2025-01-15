@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id          String    @id
+  balance     Int       @default(1000)
+  bank        Int       @default(0)
+  wallet      Int       @default(0)
+  totalWon    Int       @default(0)
+  totalLost   Int       @default(0)
+  lastDaily   DateTime?
+  streak      Int       @default(0)
+  lastSalary  DateTime?
+  role        String    @default("Member")
+  tickets     LotteryTicket[]
+}
+
+model Lottery {
+  id          String    @id @default(cuid())
+  prize       Int
+  ticketPrice Int
+  endTime     DateTime
+  winner      String?
+  active      Boolean   @default(true)
+  tickets     LotteryTicket[]
+}
+
+model LotteryTicket {
+  id        String   @id @default(cuid())
+  lotteryId String
+  userId    String
+  lottery   Lottery  @relation(fields: [lotteryId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+}
