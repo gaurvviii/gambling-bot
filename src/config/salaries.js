@@ -7,7 +7,7 @@ const ROLES = {
   },
   SERVER_BOOSTER: {
     name: 'Server Booster',
-    hourlyRate: 7.50, // $5.00 + $2.50
+    hourlyRate: 7.50, 
     hoursPerDay: 8,
     daysPerWeek: 5
   },

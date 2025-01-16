@@ -8,17 +8,20 @@ datasource db {
 }
 
 model User {
-  id          String    @id
-  balance     Int       @default(1000)
-  bank        Int       @default(0)
-  wallet      Int       @default(0)
-  totalWon    Int       @default(0)
-  totalLost   Int       @default(0)
-  lastDaily   DateTime?
-  streak      Int       @default(0)
-  lastSalary  DateTime?
-  role        String    @default("Member")
-  tickets     LotteryTicket[]
+  id            String    @id @default(cuid())
+  balance       Int       @default(1000)
+  bank          Int       @default(0)
+  wallet        Int       @default(0)
+  totalWon      Int       @default(0)
+  totalLost     Int       @default(0)
+  lastDaily     DateTime?
+  streak        Int       @default(0)
+  lastSalary    DateTime?
+  dailyClaims     Int      @default(0)
+  role          String    @default("Member")
+  tickets       LotteryTicket[]
+  claimsMade    Int       @default(0) // Track number of claims made today
+  lastClaimDate DateTime? // Track the date of the last claim
 }
 
 model Lottery {
