@@ -1,10 +1,10 @@
 const ROLE_IDS = {
-  MEMBER: '123456789012345678', // Replace with actual role ID
+  MEMBER: '1329430796901027911', 
   SERVER_BOOSTER: '234567890123456789', // Replace with actual role ID
-  DONATOR: '345678901234567890', // Replace with actual role ID
-  DONATOR_PLUS: '456789012345678901', // Replace with actual role ID
+  DONATOR: '1329431256122785823', 
+  DONATOR_PLUS: '1329432709751378034', 
   DONATOR_PLUS_PLUS: '567890123456789012', // Replace with actual role ID
-  ZYZZ_GOD: '678901234567890123', // Replace with actual role ID
+  ZYZZ_GOD: '1329432623285797006', 
   STAFF: '789012345678901234' // Replace with actual role ID
 };
 
