@@ -19,11 +19,14 @@ export class BalanceCommand extends Command {
   }
 
   async chatInputRun(interaction) {
+    console.log(`Checking balance for user ID: ${interaction.user.id}`);
+
     const user = await prisma.user.findUnique({
       where: { id: interaction.user.id }
     });
 
     if (!user) {
+      console.log('User not found, prompting to register.');
       return interaction.reply('You need to register first! Use /register');
     }
 

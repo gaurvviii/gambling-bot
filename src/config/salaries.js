@@ -1,13 +1,13 @@
-export const ROLES = {
+const ROLES = {
   MEMBER: {
     name: 'Member',
     hourlyRate: 5.00,
     hoursPerDay: 8,
     daysPerWeek: 5
   },
-  BOOSTER: {
+  SERVER_BOOSTER: {
     name: 'Server Booster',
-    hourlyRate: 7.50, // Base 5.00 + 2.50 bonus
+    hourlyRate: 7.50, // $5.00 + $2.50
     hoursPerDay: 8,
     daysPerWeek: 5
   },
@@ -41,4 +41,6 @@ export const ROLES = {
     hoursPerDay: 8,
     daysPerWeek: 5
   }
-}; 
+};
+
+export default ROLES; 

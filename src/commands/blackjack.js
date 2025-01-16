@@ -2,11 +2,6 @@ import { Command } from '@sapphire/framework';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from 'discord.js';
 import { BlackjackGame } from '../lib/games/blackjackGame.js';
 import { getUser, updateBalance } from '../lib/database.js';
-import { PrismaClient } from '@prisma/client';
-
-// Create a Map to store active games
-const games = new Map();
-const prisma = new PrismaClient();
 
 export class BlackjackCommand extends Command {
   constructor(context, options) {
@@ -17,7 +12,6 @@ export class BlackjackCommand extends Command {
     });
   }
 
-  // Rest of the code remains exactly the same...
   async registerApplicationCommands(registry) {
     registry.registerChatInputCommand((builder) =>
       builder
@@ -42,12 +36,17 @@ export class BlackjackCommand extends Command {
     const bet = interaction.options.getInteger('bet');
     const user = await getUser(userId);
 
-    if (user.balance < bet) {
-      return interaction.reply('Insufficient funds!');
+    if (user.wallet < bet) {
+      return interaction.reply('Insufficient funds in wallet!');
     }
 
     // Deduct bet amount
-    await updateBalance(userId, -bet);
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        wallet: { decrement: bet }
+      }
+    });
 
     const game = new BlackjackGame();
     games.set(userId, { game, bet });
@@ -149,26 +148,30 @@ Your value: ${game.getHandValue(game.playerHand)}
     const bet = gameData.bet;
     let winnings = 0;
 
-    // Update total won/lost statistics
     if (result === 'win') {
       winnings = bet * 2;
       await prisma.user.update({
         where: { id: userId },
         data: {
+          wallet: { increment: winnings },
           totalWon: { increment: winnings - bet }
         }
       });
-    } else if (result === 'lose' || result === 'bust') {
+    } else if (result === 'push') {
+      // Return the original bet for a push
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          wallet: { increment: bet }
+        }
+      });
+    } else {
       await prisma.user.update({
         where: { id: userId },
         data: {
           totalLost: { increment: bet }
         }
       });
-    }
-
-    if (winnings > 0) {
-      await updateBalance(userId, winnings);
     }
 
     const resultMessage = `
