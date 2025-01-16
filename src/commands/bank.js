@@ -17,11 +17,6 @@ export class BankCommand extends Command {
         .setDescription(this.description)
         .addSubcommand(subcommand =>
           subcommand
-            .setName('balance')
-            .setDescription('Check your bank balance')
-        )
-        .addSubcommand(subcommand =>
-          subcommand
             .setName('withdraw')
             .setDescription('Withdraw money to your wallet')
             .addIntegerOption(option =>
@@ -58,13 +53,6 @@ export class BankCommand extends Command {
     }
 
     switch (subcommand) {
-      case 'balance':
-        return interaction.reply(`
-💳 Bank Account 💳
-Bank Balance: $${user.bank.toFixed(2)}
-Wallet Balance: $${user.wallet.toFixed(2)}
-        `);
-
       case 'withdraw':
         const withdrawAmount = interaction.options.getInteger('amount');
         if (withdrawAmount > user.bank) {
@@ -98,4 +86,34 @@ Wallet Balance: $${user.wallet.toFixed(2)}
         return interaction.reply(`Successfully deposited $${depositAmount.toFixed(2)} to your bank!`);
     }
   }
-} 
+}
+
+// export class BankBalanceCommand extends Command {
+//   constructor(context, options) {
+//     super(context, {
+//       ...options,
+//       name: 'bankbalance', // or 'bank balance'
+//       description: 'Check your bank balance'
+//     });
+//   }
+
+//   async registerApplicationCommands(registry) {
+//     registry.registerChatInputCommand((builder) =>
+//       builder
+//         .setName(this.name)
+//         .setDescription(this.description)
+//     );
+//   }
+
+//   async chatInputRun(interaction) {
+//     const user = await prisma.user.findUnique({
+//       where: { id: interaction.user.id }
+//     });
+
+//     if (!user) {
+//       return interaction.reply('You need to register first! Use /register');
+//     }
+
+//     return interaction.reply(`Your bank balance is $${user.bank}`);
+//   }
+// }

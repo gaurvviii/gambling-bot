@@ -24,7 +24,7 @@ export class BalanceCommand extends Command {
     });
 
     if (!user) {
-      return interaction.reply('You need to create an account first!');
+      return interaction.reply('You need to register first! Use /register');
     }
 
     return interaction.reply(`

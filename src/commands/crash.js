@@ -54,6 +54,7 @@ export class CrashCommand extends Command {
     const crashPoint = this.generateCrashPoint();
     let multiplier = 1.0;
     let gameInterval;
+    let hasEnded = false;
 
     const cashoutButton = new ButtonBuilder()
       .setCustomId('cashout')
@@ -68,7 +69,7 @@ export class CrashCommand extends Command {
     });
 
     const collector = response.createMessageComponentCollector({
-      filter: i => i.user.id === userId,
+      filter: i => i.user.id === userId && !hasEnded,
       time: 30000
     });
 
@@ -79,11 +80,17 @@ export class CrashCommand extends Command {
     });
 
     gameInterval = setInterval(async () => {
+      if (hasEnded) {
+        clearInterval(gameInterval);
+        return;
+      }
+
       multiplier += 0.1;
       if (multiplier >= crashPoint) {
         clearInterval(gameInterval);
+        hasEnded = true;
         collector.stop('crash');
-        await this.endGame(interaction, userId, 0);
+        await this.endGame(interaction, userId, 0, multiplier);
       } else {
         await interaction.editReply({
           content: this.getGameState(multiplier),
@@ -93,16 +100,17 @@ export class CrashCommand extends Command {
     }, 1000);
 
     collector.on('collect', async (i) => {
-      if (i.customId === 'cashout') {
+      if (i.customId === 'cashout' && !hasEnded) {
+        hasEnded = true;
         clearInterval(gameInterval);
         const winnings = Math.floor(bet * multiplier);
-        await this.endGame(interaction, userId, winnings);
-        collector.stop();
+        await this.endGame(interaction, userId, winnings, multiplier);
+        collector.stop('cashout');
       }
     });
 
     collector.on('end', async (collected, reason) => {
-      if (reason === 'crash') {
+      if (reason === 'crash' && !hasEnded) {
         await interaction.editReply({
           content: `💥 Crashed at ${crashPoint.toFixed(1)}x!\nYou lost $${bet}!`,
           components: []
@@ -122,8 +130,10 @@ Current Multiplier: ${multiplier.toFixed(1)}x
     `;
   }
 
-  async endGame(interaction, userId, winnings) {
+  async endGame(interaction, userId, winnings, finalMultiplier) {
     const game = games.get(userId);
+    if (!game) return; // Prevent double processing
+    
     games.delete(userId);
 
     if (winnings > 0) {
@@ -137,7 +147,7 @@ Current Multiplier: ${multiplier.toFixed(1)}x
 
       await interaction.editReply({
         content: `
-🚀 Cashed out at ${(winnings / game.bet).toFixed(1)}x!
+🎉 Cashed out at ${finalMultiplier.toFixed(1)}x!
 You won $${winnings}!`,
         components: []
       });
@@ -150,4 +160,4 @@ You won $${winnings}!`,
       });
     }
   }
-} 
+}

@@ -21,8 +21,8 @@ export class TransferCommand extends Command {
             .setDescription('Transfer type')
             .setRequired(true)
             .addChoices(
-              { name: 'Bank to Wallet', value: 'toWallet' },
-              { name: 'Wallet to Bank', value: 'toBank' }
+              { name: 'Wallet to Bank', value: 'toBank' },
+              { name: 'Bank to Wallet', value: 'toWallet' }
             )
         )
         .addIntegerOption(option =>
@@ -44,29 +44,15 @@ export class TransferCommand extends Command {
     });
 
     if (!user) {
-      return interaction.reply('You need to create an account first!');
+      return interaction.reply('You need to register first! Use /register');
     }
 
-    if (type === 'toWallet') {
-      if (user.bank < amount) {
-        return interaction.reply('Insufficient funds in bank!');
-      }
-
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          bank: { decrement: amount },
-          wallet: { increment: amount }
-        }
-      });
-
-      return interaction.reply(`Successfully transferred $${amount} from bank to wallet!`);
-    } else {
+    if (type === 'toBank') {
       if (user.wallet < amount) {
-        return interaction.reply('Insufficient funds in wallet!');
+        return interaction.reply(`❌ Insufficient funds in wallet! You have $${user.wallet}`);
       }
 
-      await prisma.user.update({
+      const updatedUser = await prisma.user.update({
         where: { id: user.id },
         data: {
           wallet: { decrement: amount },
@@ -74,7 +60,32 @@ export class TransferCommand extends Command {
         }
       });
 
-      return interaction.reply(`Successfully transferred $${amount} from wallet to bank!`);
+      return interaction.reply(`
+✅ Transfer Successful!
+Transferred $${amount} to bank
+New Wallet Balance: $${updatedUser.wallet}
+New Bank Balance: $${updatedUser.bank}
+      `);
+
+    } else if (type === 'toWallet') {
+      if (user.bank < amount) {
+        return interaction.reply(`❌ Insufficient funds in bank! You have $${user.bank}`);
+      }
+
+      const updatedUser = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          bank: { decrement: amount },
+          wallet: { increment: amount }
+        }
+      });
+
+      return interaction.reply(`
+✅ Transfer Successful!
+Transferred $${amount} to wallet
+New Wallet Balance: $${updatedUser.wallet}
+New Bank Balance: $${updatedUser.bank}
+      `);
     }
   }
 } 

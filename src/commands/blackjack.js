@@ -2,6 +2,11 @@ import { Command } from '@sapphire/framework';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from 'discord.js';
 import { BlackjackGame } from '../lib/games/blackjackGame.js';
 import { getUser, updateBalance } from '../lib/database.js';
+import { PrismaClient } from '@prisma/client';
+
+// Create a Map to store active games
+const games = new Map();
+const prisma = new PrismaClient();
 
 export class BlackjackCommand extends Command {
   constructor(context, options) {
@@ -12,6 +17,7 @@ export class BlackjackCommand extends Command {
     });
   }
 
+  // Rest of the code remains exactly the same...
   async registerApplicationCommands(registry) {
     registry.registerChatInputCommand((builder) =>
       builder
@@ -179,4 +185,4 @@ ${result === 'win' ? `You won $${winnings}!` :
 
     games.delete(userId);
   }
-} 
+}

@@ -58,7 +58,6 @@ export class SalaryCommand extends Command {
     }
 
     const dailyEarnings = hourlyRate * role.hoursPerDay;
-    const weeklyEarnings = dailyEarnings * role.daysPerWeek;
 
     if (subcommand === 'info') {
       return interaction.reply(`
@@ -66,7 +65,6 @@ export class SalaryCommand extends Command {
 Role: ${role.name}${isBooster ? ' (Server Booster)' : ''}
 Hourly Rate: $${hourlyRate.toFixed(2)}
 Daily Earnings: $${dailyEarnings.toFixed(2)}
-Weekly Earnings: $${weeklyEarnings.toFixed(2)}
       `);
     } else if (subcommand === 'claim') {
       const user = await prisma.user.findUnique({
@@ -74,17 +72,22 @@ Weekly Earnings: $${weeklyEarnings.toFixed(2)}
       });
 
       if (!user) {
-        return interaction.reply('You need to create an account first!');
+        return interaction.reply('You need to register first! Use /register');
       }
 
       const now = new Date();
       const lastSalary = user.lastSalary ? new Date(user.lastSalary) : null;
 
-      if (lastSalary && lastSalary.getDate() === now.getDate()) {
-        return interaction.reply('You have already claimed your salary today!');
+      // Check if user has already claimed today
+      if (lastSalary && 
+          lastSalary.getDate() === now.getDate() && 
+          lastSalary.getMonth() === now.getMonth() && 
+          lastSalary.getFullYear() === now.getFullYear()) {
+        return interaction.reply('❌ You have already claimed your salary today!');
       }
 
-      await prisma.user.update({
+      // Update user's wallet and last claim time
+      const updatedUser = await prisma.user.update({
         where: { id: user.id },
         data: {
           wallet: { increment: dailyEarnings },
@@ -93,10 +96,11 @@ Weekly Earnings: $${weeklyEarnings.toFixed(2)}
       });
 
       return interaction.reply(`
-💰 Salary Claimed! 💰
+✅ Salary Claimed Successfully! 
 Amount: $${dailyEarnings.toFixed(2)}
-Role: ${role.name}${isBooster ? ' (Server Booster)' : ''}
-The money has been added to your wallet!
+New Wallet Balance: $${updatedUser.wallet.toFixed(2)}
+
+Next claim available in 24 hours!
       `);
     }
   }
