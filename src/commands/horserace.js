@@ -97,7 +97,12 @@ export class HorseRaceCommand extends Command {
       // Create race track visualization
       const track = HORSES.map((horse, index) => {
         const position = positions[index];
-        return `${horse.name}: ${'.'.repeat(position)}${horse.name.split(' ')[0]}${'.'.repeat(TRACK_LENGTH - position - 1)}🏁`;
+
+        // Ensure position is not negative
+        const safePosition = Math.max(position, 0);
+        const safeTrackLength = Math.max(TRACK_LENGTH - safePosition - 1, 0); // Ensure this is not negative
+
+        return `${horse.name}: ${'.'.repeat(safePosition)}${horse.name.split(' ')[0]}${'.'.repeat(safeTrackLength)}🏁`;
       }).join('\n');
 
       await interaction.editReply(`

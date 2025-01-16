@@ -1,12 +1,12 @@
 import { Command } from '@sapphire/framework';
-import { prisma } from '../lib/database.js';
+import { getUser } from '../lib/user.js';
 
 export class BalanceCommand extends Command {
   constructor(context, options) {
     super(context, {
       ...options,
       name: 'balance',
-      description: 'Check your wallet and bank balance'
+      description: 'Check your wallet balance'
     });
   }
 
@@ -19,22 +19,17 @@ export class BalanceCommand extends Command {
   }
 
   async chatInputRun(interaction) {
-    console.log(`Checking balance for user ID: ${interaction.user.id}`);
+    try {
+      const user = await getUser(interaction.user.id);
 
-    const user = await prisma.user.findUnique({
-      where: { id: interaction.user.id }
-    });
+      if (!user) {
+        return interaction.reply('You need to register first! Use /register');
+      }
 
-    if (!user) {
-      console.log('User not found, prompting to register.');
-      return interaction.reply('You need to register first! Use /register');
+      return interaction.reply(`💰 Your Balance 💰\nWallet: $${user.wallet}\nBank: $${user.bank}\nTotal: $${user.wallet + user.bank}`);
+    } catch (error) {
+      console.error('Error occurred in BalanceCommand:', error);
+      return interaction.reply('An error occurred while fetching your balance. Please try again later.');
     }
-
-    return interaction.reply(`
-💰 Your Balance 💰
-Wallet: $${user.wallet}
-Bank: $${user.bank}
-Total: $${user.wallet + user.bank}
-    `);
   }
 } 

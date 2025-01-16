@@ -27,7 +27,7 @@ export class RegisterCommand extends Command {
       data: {
         id: userId,
         wallet: 0,
-        bank: 0,
+        bank: 1000,
         // Add other fields as necessary
       }
     });

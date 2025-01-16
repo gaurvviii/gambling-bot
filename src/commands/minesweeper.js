@@ -3,7 +3,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { prisma } from '../lib/database.js';
 
 const games = new Map();
-const GRID_SIZE = 5;
+const GRID_SIZE = 4;
 const DEFAULT_MINES = 3;
 
 export class MinesweeperCommand extends Command {
@@ -52,7 +52,8 @@ export class MinesweeperCommand extends Command {
 
   createButtons(gameState) {
     const rows = [];
-    for (let i = 0; i < GRID_SIZE; i++) {
+    // Create 4 rows with 5 buttons each
+    for (let i = 0; i < 4; i++) {
       const row = new ActionRowBuilder();
       for (let j = 0; j < GRID_SIZE; j++) {
         const position = i * GRID_SIZE + j;
@@ -66,14 +67,28 @@ export class MinesweeperCommand extends Command {
       rows.push(row);
     }
     
-    const cashoutRow = new ActionRowBuilder().addComponents(
+    // Last row combines the remaining game buttons and cashout button
+    const lastRow = new ActionRowBuilder();
+    // Add the remaining game buttons (last row)
+    for (let j = 0; j < GRID_SIZE; j++) {
+      const position = 4 * GRID_SIZE + j;
+      const button = new ButtonBuilder()
+        .setCustomId(`tile_${position}`)
+        .setLabel(gameState.revealed.has(position) ? '✅' : '?')
+        .setStyle(gameState.revealed.has(position) ? ButtonStyle.Success : ButtonStyle.Secondary)
+        .setDisabled(gameState.revealed.has(position));
+      lastRow.addComponents(button);
+    }
+
+    // Add the cashout button to the last row
+    lastRow.addComponents(
       new ButtonBuilder()
         .setCustomId('cashout')
         .setLabel('Cash Out')
         .setStyle(ButtonStyle.Danger)
     );
-    rows.push(cashoutRow);
-
+    
+    rows.push(lastRow);
     return rows;
   }
 

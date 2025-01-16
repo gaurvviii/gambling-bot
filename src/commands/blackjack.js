@@ -1,7 +1,11 @@
 import { Command } from '@sapphire/framework';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from 'discord.js';
 import { BlackjackGame } from '../lib/games/blackjackGame.js';
-import { getUser, updateBalance } from '../lib/database.js';
+import { getUser } from '../lib/user.js';
+import { prisma } from '../lib/database.js';
+
+// Define the games map to track active games
+const games = new Map();
 
 export class BlackjackCommand extends Command {
   constructor(context, options) {
@@ -28,86 +32,91 @@ export class BlackjackCommand extends Command {
   }
 
   async chatInputRun(interaction) {
-    const userId = interaction.user.id;
-    if (games.has(userId)) {
-      return interaction.reply('You already have a game in progress!');
-    }
-
-    const bet = interaction.options.getInteger('bet');
-    const user = await getUser(userId);
-
-    if (user.wallet < bet) {
-      return interaction.reply('Insufficient funds in wallet!');
-    }
-
-    // Deduct bet amount
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        wallet: { decrement: bet }
-      }
-    });
-
-    const game = new BlackjackGame();
-    games.set(userId, { game, bet });
-    game.dealInitialCards();
-
-    const buttons = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('hit')
-        .setLabel('Hit')
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId('stand')
-        .setLabel('Stand')
-        .setStyle(ButtonStyle.Secondary)
-    );
-
-    const response = await interaction.reply({
-      content: this.getGameState(game),
-      components: [buttons]
-    });
-
-    const collector = response.createMessageComponentCollector({
-      componentType: ComponentType.Button,
-      time: 30000
-    });
-
-    collector.on('collect', async (i) => {
-      if (i.user.id !== userId) {
-        return i.reply({ content: 'This is not your game!', ephemeral: true });
+    try {
+      const userId = interaction.user.id;
+      if (games.has(userId)) {
+        return interaction.reply('You already have a game in progress!');
       }
 
-      const gameData = games.get(userId);
-      const game = gameData.game;
+      const bet = interaction.options.getInteger('bet');
+      const user = await getUser(userId);
 
-      if (i.customId === 'hit') {
-        game.hit(game.playerHand);
-        const playerValue = game.getHandValue(game.playerHand);
+      if (user.wallet < bet) {
+        return interaction.reply('Insufficient funds in wallet!');
+      }
 
-        if (playerValue > 21) {
-          await this.endGame(i, game, userId, 'bust');
-          collector.stop();
-        } else {
-          await i.update({ content: this.getGameState(game), components: [buttons] });
+      // Deduct bet amount
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          wallet: { decrement: bet }
         }
-      } else if (i.customId === 'stand') {
-        game.dealerPlay();
-        const result = this.determineWinner(game);
-        await this.endGame(i, game, userId, result);
-        collector.stop();
-      }
-    });
+      });
 
-    collector.on('end', (collected, reason) => {
-      if (reason === 'time') {
-        interaction.editReply({
-          content: 'Game expired due to inactivity!',
-          components: []
-        });
-        games.delete(userId);
-      }
-    });
+      const game = new BlackjackGame();
+      games.set(userId, { game, bet });
+      game.dealInitialCards();
+
+      const buttons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('hit')
+          .setLabel('Hit')
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId('stand')
+          .setLabel('Stand')
+          .setStyle(ButtonStyle.Secondary)
+      );
+
+      const response = await interaction.reply({
+        content: this.getGameState(game),
+        components: [buttons]
+      });
+
+      const collector = response.createMessageComponentCollector({
+        componentType: ComponentType.Button,
+        time: 30000
+      });
+
+      collector.on('collect', async (i) => {
+        if (i.user.id !== userId) {
+          return i.reply({ content: 'This is not your game!', ephemeral: true });
+        }
+
+        const gameData = games.get(userId);
+        const game = gameData.game;
+
+        if (i.customId === 'hit') {
+          game.hit(game.playerHand);
+          const playerValue = game.getHandValue(game.playerHand);
+
+          if (playerValue > 21) {
+            await this.endGame(i, game, userId, 'bust');
+            collector.stop();
+          } else {
+            await i.update({ content: this.getGameState(game), components: [buttons] });
+          }
+        } else if (i.customId === 'stand') {
+          game.dealerPlay();
+          const result = this.determineWinner(game);
+          await this.endGame(i, game, userId, result);
+          collector.stop();
+        }
+      });
+
+      collector.on('end', (_, reason) => {
+        if (reason === 'time') {
+          interaction.editReply({
+            content: 'Game expired due to inactivity!',
+            components: []
+          });
+          games.delete(userId);
+        }
+      });
+    } catch (error) {
+      console.error('Error occurred in BlackjackCommand:', error);
+      return interaction.reply('An error occurred while processing your request. Please try again later.');
+    }
   }
 
   getGameState(game) {
