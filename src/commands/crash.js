@@ -39,7 +39,11 @@ export class CrashCommand extends Command {
       where: { id: userId }
     });
 
-    if (bet > user.wallet) {
+    if (!user) {
+      return interaction.reply('You do not have an account. Please register first.');
+    }
+
+    if (user.wallet < bet) {
       return interaction.reply('Insufficient funds in wallet!');
     }
 
