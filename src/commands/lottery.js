@@ -47,6 +47,11 @@ export class LotteryCommand extends Command {
                         { name: 'lottery_id', description: 'ID of the lottery', type: ApplicationCommandOptionType.String, required: true },
                     ],
                 },
+                {
+                    name: 'all',
+                    description: 'Show all lotteries and your participation status',
+                    type: ApplicationCommandOptionType.Subcommand,
+                },
             ],
         });
     }
@@ -59,6 +64,8 @@ export class LotteryCommand extends Command {
             await this.showLotteryInfo(interaction);
         } else if (subcommand === 'buy') {
             await this.buyTicket(interaction);
+        } else if (subcommand === 'all') {
+            await this.showAllLotteries(interaction);
         }
     }
 
@@ -162,6 +169,54 @@ export class LotteryCommand extends Command {
         } catch (error) {
             console.error('Error buying ticket:', error);
             await interaction.reply('An error occurred while purchasing your ticket. Please try again later.');
+        }
+    }
+
+    // Show all lotteries and user participation status
+    async showAllLotteries(interaction) {
+        try {
+            // Fetch all lotteries and include tickets information
+            const lotteries = await prisma.lottery.findMany({
+                include: { tickets: true },
+            });
+
+            // Check if there are any lotteries
+            if (lotteries.length === 0) {
+                return interaction.reply('No lotteries have been created yet.');
+            }
+
+            // Create an embed for the response
+            const embed = new EmbedBuilder()
+                .setTitle('All Lotteries')
+                .setDescription('Here are all the lotteries and your participation status.');
+
+            // Loop through each lottery and add information to the embed
+            lotteries.forEach(lottery => {
+                // Check if the user has tickets for this lottery
+                const userTickets = lottery.tickets.filter(ticket => ticket.userId === interaction.user.id).length;
+                const timeRemaining = Math.max(0, (lottery.endTime.getTime() - Date.now()) / 1000);
+
+                // Add lottery information to the embed
+                embed.addFields(
+                    {
+                        name: `Lottery ID: ${lottery.id}`,
+                        value: `
+                            Prize Pool: $${lottery.prize}
+                            Ticket Price: $${lottery.ticketPrice}
+                            Tickets Sold: ${lottery.tickets.length}
+                            Time Remaining: ${Math.floor(timeRemaining / 3600)}h ${Math.floor((timeRemaining % 3600) / 60)}m
+                            Your Tickets: ${userTickets > 0 ? userTickets : 'None'}
+                        `,
+                        inline: false,
+                    }
+                );
+            });
+
+            // Send the embed with all lottery information
+            await interaction.reply({ embeds: [embed] });
+        } catch (error) {
+            console.error('Error showing all lotteries:', error);
+            await interaction.reply('An error occurred while fetching lottery information.');
         }
     }
 }
