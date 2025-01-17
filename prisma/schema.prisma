@@ -1,28 +1,36 @@
+// Define the datasource block
+datasource db {
+  provider = "postgresql" 
+  url      = env("DATABASE_URL") 
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
 model User {
-  id            String    @id @default(cuid())
-  balance       Int       @default(1000)
-  bank          Int       @default(0)
-  wallet        Int       @default(0)
-  totalWon      Int       @default(0)
-  totalLost     Int       @default(0)
-  lastDaily     DateTime?
-  streak        Int       @default(0)
-  lastSalary    DateTime?
-  dailyClaims   Int       @default(0)
-  role          String    @default("Member")
-  tickets       LotteryTicket[]
-  claimsMade    Int       @default(0) // Track number of claims made today
-  lastClaimDate DateTime? // Track the date of the last claim
+  id                   String             @id @default(cuid())
+  balance              Int                @default(1000)
+  bank                 Int                @default(0)
+  wallet               Int                @default(0)
+  wantsNotifications   Boolean            @default(false)
+  totalWon             Int                @default(0)
+  totalLost            Int                @default(0)
+  lastSalaryClaim      DateTime?          @db.Timestamp // Track the date of the last salary claim
+  lastClaimDate        DateTime?          @db.Timestamp
+  claimsMade           Int                @default(0) // Track the total number of claims made
+  role                 String             @default("Member")
+  tickets              LotteryTicket[] 
 }
 
 model Lottery {
   id          String    @id @default(cuid())
   prize       Int
   ticketPrice Int
-  endTime     DateTime
+  endTime     DateTime  @db.Timestamp // End time of the lottery
   winner      String?
   active      Boolean   @default(true)
-  tickets     LotteryTicket[]
+  tickets     LotteryTicket[] // Associated tickets for the lottery
 }
 
 model LotteryTicket {

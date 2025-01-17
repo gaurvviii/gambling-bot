@@ -2,6 +2,7 @@ import { LogLevel, SapphireClient } from '@sapphire/framework';
 import '@sapphire/plugin-logger/register';
 import { GatewayIntentBits, ActivityType } from 'discord.js';
 import { config } from 'dotenv';
+import './lib/lotteryManager.js';
 
 config();
 

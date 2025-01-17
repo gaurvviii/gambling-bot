@@ -5,7 +5,8 @@ const ROLE_IDS = {
   DONATOR_PLUS: '1329432709751378034', 
   DONATOR_PLUS_PLUS: '567890123456789012', // Replace with actual role ID
   ZYZZ_GOD: '1329432623285797006', 
-  STAFF: '789012345678901234' // Replace with actual role ID
+  STAFF: '789012345678901234', // Replace with actual role ID
+  ADMIN: '1329069715812909151' 
 };
 
 export default ROLE_IDS; 

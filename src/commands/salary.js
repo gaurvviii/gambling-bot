@@ -1,5 +1,5 @@
 import { Command } from "@sapphire/framework";
-import { getUser } from "../lib/user.js";
+import { getUser  } from "../lib/user.js";
 import ROLES from "../config/salaries.js";
 import ROLE_IDS from "../config/roleIds.js";
 import { prisma } from "../lib/database.js";
@@ -15,10 +15,13 @@ export class SalaryCommand extends Command {
 
     async chatInputRun(interaction) {
         try {
-            const user = await getUser(interaction.user.id);
+            // Acknowledge the interaction immediately
+            await interaction.deferReply();
+
+            const user = await getUser (interaction.user.id);
 
             if (!user) {
-                return interaction.reply(
+                return interaction.editReply(
                     "You need to register first! Use /register"
                 );
             }
@@ -35,7 +38,7 @@ export class SalaryCommand extends Command {
                 );
                 if (hoursSinceLastClaim < 24) {
                     const hoursRemaining = 24 - hoursSinceLastClaim;
-                    return interaction.reply(
+                    return interaction.editReply(
                         `You can only claim your salary once per day. Please wait ${hoursRemaining} hours.`
                     );
                 }
@@ -73,16 +76,18 @@ export class SalaryCommand extends Command {
                 },
             });
 
-            return interaction.reply(
+            return interaction.editReply(
                 `You have claimed your daily salary of $${earnings.toFixed(
                     2
                 )} (8 hours worth)!`
             );
         } catch (error) {
             console.error("Error occurred in SalaryCommand:", error); // Log the error for debugging
-            return interaction.reply(
-                "An error occurred while processing your request. Please try again later."
-            ); // User-friendly error message
+            if (!interaction.replied) {
+                await interaction.editReply(
+                    "An error occurred while processing your request. Please try again later."
+                ); // User-friendly error message
+            }
         }
     }
 }
