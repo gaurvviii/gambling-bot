@@ -1,9 +1,9 @@
 import { Command } from '@sapphire/framework';
-import { EmbedBuilder, ApplicationCommandOptionType } from 'discord.js';
-import { prisma } from '../lib/database.js'; 
+import { EmbedBuilder } from 'discord.js';
+import { ApplicationCommandOptionType } from 'discord-api-types/v9';
+import { prisma } from '../lib/database.js';
 import ROLE_IDS from '../config/roleIds.js';
 import { getUser } from '../lib/user.js';
-import { ApplicationCommandOptionType } from 'discord-api-types/v9';
 
 export class LotteryCommand extends Command {
     constructor(context, options) {
@@ -13,256 +13,317 @@ export class LotteryCommand extends Command {
             description: 'Manage lotteries in the server',
             chatInputCommand: {
                 register: true,
+                idHints: ['lottery-command'],
                 behaviorWhenNotIdentical: 'overwrite',
+                guildIds: [],
             },
-            options: [
-                {
-                    name: 'create',
-                    description: 'Create a new lottery',
-                    type: ApplicationCommandOptionType.Subcommand,
-                    options: [
-                        { name: 'prize', description: 'Prize amount', type: ApplicationCommandOptionType.Integer, required: true },
-                        { name: 'ticket_price', description: 'Price of a ticket', type: ApplicationCommandOptionType.Integer, required: true },
-                        { name: 'duration', description: 'Duration in hours', type: ApplicationCommandOptionType.Integer, required: true },
-                    ],
-                },
-                {
-                    name: 'info',
-                    description: 'Get information about a lottery',
-                    type: ApplicationCommandOptionType.Subcommand,
-                    options: [
-                        {
-                            name: 'lottery_id',
-                            description: 'The ID of the lottery',
-                            type: ApplicationCommandOptionType.Integer,
-                            required: true,
-                        },
-                    ],
-                },
-                {
-                    name: 'buy',
-                    description: 'Buy a ticket for a lottery',
-                    type: ApplicationCommandOptionType.Subcommand,
-                    options: [
-                        { name: 'lottery_id', description: 'ID of the lottery', type: ApplicationCommandOptionType.String, required: true },
-                    ],
-                },
-                {
-                    name: 'all',
-                    description: 'Show all lotteries and your participation status',
-                    type: ApplicationCommandOptionType.Subcommand,
-                },
-            ],
         });
+    }
+
+    registerApplicationCommands(registry) {
+        registry.registerChatInputCommand((builder) =>
+            builder
+                .setName('lottery')
+                .setDescription('Manage lotteries in the server')
+                .addSubcommand((subcommand) =>
+                    subcommand
+                        .setName('create')
+                        .setDescription('Create a new lottery (Admin only)')
+                        .addIntegerOption((option) =>
+                            option
+                                .setName('prize')
+                                .setDescription('Prize amount in coins')
+                                .setRequired(true)
+                                .setMinValue(100)
+                        )
+                        .addIntegerOption((option) =>
+                            option
+                                .setName('ticket_price')
+                                .setDescription('Price of a ticket in coins')
+                                .setRequired(true)
+                                .setMinValue(10)
+                        )
+                        .addIntegerOption((option) =>
+                            option
+                                .setName('duration')
+                                .setDescription('Duration in hours')
+                                .setRequired(true)
+                                .setMinValue(1)
+                                .setMaxValue(168)
+                        )
+                )
+                .addSubcommand((subcommand) =>
+                    subcommand
+                        .setName('draw')
+                        .setDescription('Draw a winner for a lottery (Admin only)')
+                        .addStringOption((option) =>
+                            option
+                                .setName('lottery_id')
+                                .setDescription('The ID of the lottery to draw')
+                                .setRequired(true)
+                        )
+                )
+                .addSubcommand((subcommand) =>
+                    subcommand
+                        .setName('info')
+                        .setDescription('List all active lotteries')
+                )
+                .addSubcommand((subcommand) =>
+                    subcommand
+                        .setName('buy')
+                        .setDescription('Buy a ticket for a lottery')
+                        .addStringOption((option) =>
+                            option
+                                .setName('lottery_id')
+                                .setDescription('ID of the lottery')
+                                .setRequired(true)
+                        )
+                        .addIntegerOption((option) =>
+                            option
+                                .setName('amount')
+                                .setDescription('Number of tickets to buy (default: 1)')
+                                .setMinValue(1)
+                                .setMaxValue(10)
+                        )
+                )
+        );
     }
 
     async chatInputRun(interaction) {
         const subcommand = interaction.options.getSubcommand();
-        if (subcommand === 'create') {
-            await this.createLottery(interaction);
-        } else if (subcommand === 'info') {
-            await this.showLotteryInfo(interaction);
-        } else if (subcommand === 'buy') {
-            await this.buyTicket(interaction);
-        } else if (subcommand === 'all') {
-            await this.showAllLotteries(interaction);
+        
+        try {
+            await interaction.deferReply({ ephemeral: subcommand !== 'info' && subcommand !== 'create' && subcommand !== 'draw' });
+
+            if (subcommand === 'create' || subcommand === 'draw') {
+                if (!interaction.member.roles.cache.has(ROLE_IDS.ADMIN)) {
+                    return interaction.editReply({
+                        content: '❌ This command is only available to administrators!',
+                        flags: ['Ephemeral']
+                    });
+                }
+            }
+
+            switch (subcommand) {
+                case 'create':
+                    await this.createLottery(interaction);
+                    break;
+                case 'draw':
+                    await this.drawLottery(interaction);
+                    break;
+                case 'info':
+                    await this.showActiveLotteries(interaction);
+                    break;
+                case 'buy':
+                    await this.buyTicket(interaction);
+                    break;
+            }
+        } catch (error) {
+            console.error(`Error in lottery command (${subcommand}):`, error);
+            const reply = interaction.deferred ? interaction.editReply : interaction.reply;
+            await reply.call(interaction, {
+                content: 'An error occurred while processing your command. Please try again later.',
+                flags: ['Ephemeral']
+            }).catch(() => {});
         }
     }
 
-    // Create a new lottery
     async createLottery(interaction) {
-        try {
-            const member = interaction.member;
+        const prize = interaction.options.getInteger('prize');
+        const ticketPrice = interaction.options.getInteger('ticket_price');
+        const duration = interaction.options.getInteger('duration');
+        const endTime = new Date(Date.now() + duration * 3600000);
 
-            if (!member.roles.cache.has(ROLE_IDS.ADMIN)) {
-                return interaction.reply('You do not have permission to create a lottery!');
-            }
-
-            const prize = interaction.options.getInteger('prize', true);
-            const ticketPrice = interaction.options.getInteger('ticket_price', true);
-            const duration = interaction.options.getInteger('duration', true);
-            const endTime = new Date(Date.now() + duration * 3600000); // Duration in hours
-
-            const lottery = await prisma.lottery.create({
-                data: {
-                    prize,
-                    ticketPrice,
-                    endTime,
-                    active: true,
-                },
-            });
-
-            await interaction.reply(`Lottery created! ID: ${lottery.id}, Prize: $${prize}, Ticket Price: $${ticketPrice}`);
-        } catch (error) {
-            console.error('Error creating lottery:', error);
-            await interaction.reply('An error occurred while creating the lottery. Please try again later.');
-        }
-    }
-
-    // Show information about a lottery
-    async showLotteryInfo(interaction) {
-        try {
-            const lotteryId = interaction.options.getString('lottery_id', true); // Get lottery_id as string
-
-            const lottery = await prisma.lottery.findUnique({
-                where: { id: lotteryId },
-                include: { tickets: true }, // Include related tickets
-            });
-
-            if (!lottery) {
-                return interaction.reply('This lottery does not exist.');
-            }
-
-            const timeRemaining = Math.max(0, (lottery.endTime.getTime() - Date.now()) / 1000);
-            const userTickets = lottery.tickets.filter(ticket => ticket.userId === interaction.user.id).length;
-
-            const embed = new EmbedBuilder()
-                .setTitle(`Lottery ID: ${lottery.id}`)
-                .addFields(
-                    { name: 'Prize Pool', value: `$${lottery.prize}`, inline: true },
-                    { name: 'Ticket Price', value: `$${lottery.ticketPrice}`, inline: true },
-                    { name: 'Tickets Sold', value: `${lottery.tickets.length}`, inline: true },
-                    { name: 'Time Remaining', value: `${Math.floor(timeRemaining / 3600)}h ${Math.floor((timeRemaining % 3600) / 60)}m`, inline: true },
-                    { name: 'Your Tickets', value: `${userTickets}`, inline: true }
-                );
-
-            await interaction.reply({ embeds: [embed] });
-        } catch (error) {
-            console.error('Error showing lottery info:', error);
-            await interaction.reply('An error occurred while fetching lottery information.');
-        }
-    }
-
-    // Buy a ticket for a lottery
-    async buyTicket(interaction) {
-        try {
-            const lotteryId = interaction.options.getString('lottery_id', true); // Get lottery_id as string
-            const userId = interaction.user.id;
-
-            const lottery = await prisma.lottery.findUnique({
-                where: { id: lotteryId },
-                include: { tickets: true },
-            });
-
-            if (!lottery || !lottery.active) {
-                return interaction.reply('This lottery does not exist or is no longer active.');
-            }
-
-            const user = await getUser(userId);
-            if (user.wallet < lottery.ticketPrice) {
-                return interaction.reply('Insufficient funds in wallet!');
-            }
-
-            await prisma.user.update({
-                where: { id: userId },
-                data: { wallet: { decrement: lottery.ticketPrice } },
-            });
-
-            const ticket = await prisma.lotteryTicket.create({
-                data: {
-                    userId: userId,
-                    lotteryId: lotteryId, // Connect to lottery_id in the database
-                },
-            });
-
-            await interaction.reply(`You have successfully purchased a lottery ticket for lottery ID: ${lotteryId}! Ticket ID: ${ticket.id}`);
-        } catch (error) {
-            console.error('Error buying ticket:', error);
-            await interaction.reply('An error occurred while purchasing your ticket. Please try again later.');
-        }
-    }
-
-    // Show all lotteries and user participation status
-    async showAllLotteries(interaction) {
-        try {
-            // Fetch all lotteries and include tickets information
-            const lotteries = await prisma.lottery.findMany({
-                include: { tickets: true },
-            });
-
-            // Check if there are any lotteries
-            if (lotteries.length === 0) {
-                return interaction.reply('No lotteries have been created yet.');
-            }
-
-            // Create an embed for the response
-            const embed = new EmbedBuilder()
-                .setTitle('All Lotteries')
-                .setDescription('Here are all the lotteries and your participation status.');
-
-            // Loop through each lottery and add information to the embed
-            lotteries.forEach(lottery => {
-                // Check if the user has tickets for this lottery
-                const userTickets = lottery.tickets.filter(ticket => ticket.userId === interaction.user.id).length;
-                const timeRemaining = Math.max(0, (lottery.endTime.getTime() - Date.now()) / 1000);
-
-                // Add lottery information to the embed
-                embed.addFields(
-                    {
-                        name: `Lottery ID: ${lottery.id}`,
-                        value: `
-                            Prize Pool: $${lottery.prize}
-                            Ticket Price: $${lottery.ticketPrice}
-                            Tickets Sold: ${lottery.tickets.length}
-                            Time Remaining: ${Math.floor(timeRemaining / 3600)}h ${Math.floor((timeRemaining % 3600) / 60)}m
-                            Your Tickets: ${userTickets > 0 ? userTickets : 'None'}
-                        `,
-                        inline: false,
-                    }
-                );
-            });
-
-            // Send the embed with all lottery information
-            await interaction.reply({ embeds: [embed] });
-        } catch (error) {
-            console.error('Error showing all lotteries:', error);
-            await interaction.reply('An error occurred while fetching lottery information.');
-        }
-    }
-}
-
-// Function to automatically draw winners for expired lotteries
-async function drawExpiredLotteries() {
-    try {
-        const currentTime = new Date();
-
-        const expiredLotteries = await prisma.lottery.findMany({
-            where: {
+        const lottery = await prisma.lottery.create({
+            data: {
+                prize,
+                ticketPrice,
+                endTime,
                 active: true,
-                endTime: { lte: currentTime },
-            },
-            include: {
-                tickets: { select: { userId: true } },
             },
         });
 
-        for (const lottery of expiredLotteries) {
-            if (lottery.tickets.length === 0) {
-                await prisma.lottery.update({
-                    where: { id: lottery.id },
-                    data: { active: false },
-                });
-                continue;
-            }
+        const embed = new EmbedBuilder()
+            .setTitle('🎉 New Lottery Created!')
+            .setColor('#00FF00')
+            .addFields(
+                { name: 'Lottery ID', value: lottery.id, inline: true },
+                { name: 'Prize Pool', value: `${prize} coins`, inline: true },
+                { name: 'Ticket Price', value: `${ticketPrice} coins`, inline: true },
+                { name: 'Duration', value: `${duration} hours`, inline: true },
+                { name: 'Ends At', value: `<t:${Math.floor(endTime.getTime() / 1000)}:R>`, inline: true }
+            )
+            .setFooter({ text: 'Use /lottery buy to purchase tickets!' });
 
-            const winnerTicket = lottery.tickets[Math.floor(Math.random() * lottery.tickets.length)];
+        await interaction.editReply({ embeds: [embed] });
+    }
 
+    async drawLottery(interaction) {
+        const lotteryId = interaction.options.getString('lottery_id');
+
+        const lottery = await prisma.lottery.findUnique({
+            where: { id: lotteryId },
+            include: { tickets: true },
+        });
+
+        if (!lottery) {
+            return interaction.editReply({
+                content: '❌ This lottery does not exist.',
+                flags: ['Ephemeral']
+            });
+        }
+
+        if (!lottery.active) {
+            return interaction.editReply({
+                content: '❌ This lottery has already been drawn.',
+                flags: ['Ephemeral']
+            });
+        }
+
+        if (lottery.endTime > new Date()) {
+            return interaction.editReply({
+                content: '❌ This lottery has not ended yet.',
+                flags: ['Ephemeral']
+            });
+        }
+
+        if (lottery.tickets.length === 0) {
             await prisma.lottery.update({
-                where: { id: lottery.id },
+                where: { id: lotteryId },
                 data: { active: false },
+            });
+
+            return interaction.editReply({
+                content: '❌ No tickets were purchased for this lottery. The lottery has been closed.',
+                flags: ['Ephemeral']
+            });
+        }
+
+        const winnerTicket = lottery.tickets[Math.floor(Math.random() * lottery.tickets.length)];
+
+        await prisma.$transaction(async (prisma) => {
+            await prisma.lottery.update({
+                where: { id: lotteryId },
+                data: { 
+                    active: false,
+                    winnerId: winnerTicket.userId
+                },
             });
 
             await prisma.user.update({
                 where: { id: winnerTicket.userId },
                 data: { wallet: { increment: lottery.prize } },
             });
+        });
 
-            console.log(`🎉 Lottery Winner: <@${winnerTicket.userId}> has won $${lottery.prize} from lottery ID: ${lottery.id}!`);
+        const embed = new EmbedBuilder()
+            .setTitle('🎉 Lottery Winner Drawn!')
+            .setColor('#FFD700')
+            .addFields(
+                { name: 'Lottery ID', value: lotteryId, inline: true },
+                { name: 'Prize', value: `${lottery.prize} coins`, inline: true },
+                { name: 'Winner', value: `<@${winnerTicket.userId}>`, inline: true },
+                { name: 'Total Tickets', value: `${lottery.tickets.length}`, inline: true }
+            );
+
+        await interaction.editReply({ embeds: [embed] });
+    }
+
+    async showActiveLotteries(interaction) {
+        const activeLotteries = await prisma.lottery.findMany({
+            where: { active: true },
+            include: { tickets: true },
+            orderBy: { endTime: 'asc' }
+        });
+
+        if (activeLotteries.length === 0) {
+            return interaction.editReply({
+                content: '❌ There are no active lotteries at the moment.',
+                flags: ['Ephemeral']
+            });
         }
-    } catch (error) {
-        console.error('Error drawing expired lotteries:', error);
+
+        const embed = new EmbedBuilder()
+            .setTitle('🎫 Active Lotteries')
+            .setColor('#00FF00')
+            .setDescription('Here are all the currently active lotteries:');
+
+        for (const lottery of activeLotteries) {
+            const userTickets = lottery.tickets.filter(ticket => ticket.userId === interaction.user.id).length;
+            const totalTickets = lottery.tickets.length;
+            const winChance = totalTickets > 0 ? ((userTickets / totalTickets) * 100).toFixed(2) : '0.00';
+
+            embed.addFields({
+                name: `Lottery #${lottery.id}`,
+                value: `💰 Prize: ${lottery.prize} coins\n` +
+                       `🎟️ Ticket Price: ${lottery.ticketPrice} coins\n` +
+                       `📊 Total Tickets: ${totalTickets}\n` +
+                       `🎯 Your Tickets: ${userTickets} (${winChance}% chance)\n` +
+                       `⏰ Ends: <t:${Math.floor(lottery.endTime.getTime() / 1000)}:R>`,
+                inline: false
+            });
+        }
+
+        embed.setFooter({ text: 'Use /lottery buy <lottery_id> to purchase tickets!' });
+
+        await interaction.editReply({ embeds: [embed] });
+    }
+
+    async buyTicket(interaction) {
+        const lotteryId = interaction.options.getString('lottery_id');
+        const amount = interaction.options.getInteger('amount') || 1;
+        const userId = interaction.user.id;
+
+        const lottery = await prisma.lottery.findUnique({
+            where: { id: lotteryId },
+            include: { tickets: true },
+        });
+
+        if (!lottery || !lottery.active) {
+            return interaction.editReply({
+                content: '❌ This lottery does not exist or has ended.',
+                flags: ['Ephemeral']
+            });
+        }
+
+        const totalCost = lottery.ticketPrice * amount;
+        const user = await getUser(userId);
+
+        if (user.wallet < totalCost) {
+            return interaction.editReply({
+                content: `❌ Insufficient funds! You need ${totalCost} coins to buy ${amount} ticket${amount > 1 ? 's' : ''}.`,
+                flags: ['Ephemeral']
+            });
+        }
+
+        await prisma.$transaction(async (prisma) => {
+            const ticketPromises = Array(amount).fill(0).map(() =>
+                prisma.lotteryTicket.create({
+                    data: {
+                        userId,
+                        lotteryId,
+                    },
+                })
+            );
+            await Promise.all(ticketPromises);
+
+            await prisma.user.update({
+                where: { id: userId },
+                data: { wallet: { decrement: totalCost } },
+            });
+        });
+
+        const embed = new EmbedBuilder()
+            .setTitle('🎉 Tickets Purchased!')
+            .setColor('#00FF00')
+            .addFields(
+                { name: 'Lottery ID', value: lotteryId, inline: true },
+                { name: 'Tickets Bought', value: `${amount}`, inline: true },
+                { name: 'Total Cost', value: `${totalCost} coins`, inline: true },
+                { name: 'Prize Pool', value: `${lottery.prize} coins`, inline: true },
+                { name: 'Ends At', value: `<t:${Math.floor(lottery.endTime.getTime() / 1000)}:R>`, inline: true }
+            );
+
+        await interaction.editReply({ embeds: [embed] });
     }
 }
-
-// Check for expired lotteries every minute
-setInterval(drawExpiredLotteries, 60000);

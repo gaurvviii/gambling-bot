@@ -7,6 +7,6 @@ const ROLE_IDS = {
   ZYZZ_GOD: '1329432623285797006', 
   STAFF: '789012345678901234', // Replace with actual role ID
   ADMIN: '1329069715812909151' 
-};
+}
 
 export default ROLE_IDS; 

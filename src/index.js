@@ -2,7 +2,6 @@ import { LogLevel, SapphireClient } from '@sapphire/framework';
 import '@sapphire/plugin-logger/register';
 import { GatewayIntentBits, ActivityType } from 'discord.js';
 import { config } from 'dotenv';
-import './lib/lotteryManager.js';
 
 config();
 
@@ -29,7 +28,7 @@ client.once('ready', async () => {
     console.log(`Current commands: ${commands?.size ?? 0}`);
 
     // Force register commands to your server
-    const guild = await client.guilds.fetch('1194347543559880754'); // Your server ID
+    const guild = await client.guilds.fetch('1328764959907385357'); // Your server ID
     const guildCommands = await guild.commands.set([
       {
         name: 'slots',
@@ -60,16 +59,16 @@ client.once('ready', async () => {
         description: 'Bet on horse races'
       },
       {
-        name: 'lottery',
-        description: 'Participate in server lottery'
-      },
-      {
         name: 'bank',
         description: 'Manage your bank account'
       },
       {
         name: 'salary',
         description: 'View and claim your salary'
+      },
+      {
+        name: 'lottery',
+        description: 'Participate in server lottery'
       }
     ]);
 
