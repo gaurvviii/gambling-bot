@@ -1,6 +1,7 @@
 import { Command } from '@sapphire/framework';
 import { prisma } from '../lib/database.js';
 import { EmbedBuilder } from 'discord.js';
+import { getUser } from '../lib/user.js'; 
 
 export class LeaderboardCommand extends Command {
   constructor(context, options) {
@@ -16,7 +17,7 @@ export class LeaderboardCommand extends Command {
       builder
         .setName(this.name)
         .setDescription(this.description)
-        .addStringOption(option =>
+        .addStringOption((option) =>
           option
             .setName('type')
             .setDescription('Type of leaderboard to view')
@@ -31,52 +32,58 @@ export class LeaderboardCommand extends Command {
   }
 
   async chatInputRun(interaction) {
+    await interaction.deferReply();
+
+    const user = await getUser(interaction.user.id);
+    if (!user) {
+      return interaction.editReply({
+        content: 'You need to register first!',
+        ephemeral: true
+      });
+    }
+
     const type = interaction.options.getString('type');
     let users;
     let title;
     let description;
 
-    switch (type) {
-      case 'wealth':
-        users = await prisma.user.findMany({
-          orderBy: [
-            {
-              wallet: 'desc'
-            },
-            {
-              bank: 'desc'
-            }
-          ],
-          take: 10
-        });
-        
-        title = '💰 Wealthiest Gamblers';
-        description = await this.formatWealthLeaderboard(users, interaction.client);
-        break;
+    try {
+      switch (type) {
+        case 'wealth':
+          users = await prisma.user.findMany({
+            orderBy: [{ wallet: 'desc' }, { bank: 'desc' }],
+            take: 10
+          });
+          title = '💰 Wealthiest Gamblers';
+          description = await this.formatWealthLeaderboard(users, interaction.client);
+          break;
 
-      case 'won':
-        users = await prisma.user.findMany({
-          orderBy: {
-            totalWon: 'desc'
-          },
-          take: 10
-        });
-        
-        title = '🎰 Biggest Winners';
-        description = await this.formatWinLossLeaderboard(users, interaction.client, 'totalWon');
-        break;
+        case 'won':
+          users = await prisma.user.findMany({
+            orderBy: { totalWon: 'desc' },
+            take: 10
+          });
+          title = '🎰 Biggest Winners';
+          description = await this.formatWinLossLeaderboard(users, interaction.client, 'totalWon');
+          break;
 
-      case 'lost':
-        users = await prisma.user.findMany({
-          orderBy: {
-            totalLost: 'desc'
-          },
-          take: 10
-        });
-        
-        title = '📉 Biggest Losers';
-        description = await this.formatWinLossLeaderboard(users, interaction.client, 'totalLost');
-        break;
+        case 'lost':
+          users = await prisma.user.findMany({
+            orderBy: { totalLost: 'desc' },
+            take: 10
+          });
+          title = '📉 Biggest Losers';
+          description = await this.formatWinLossLeaderboard(users, interaction.client, 'totalLost');
+          break;
+
+        default:
+          throw new Error('Invalid leaderboard type');
+      }
+    } catch (error) {
+      return interaction.editReply({
+        content: 'An error occurred while fetching the leaderboard. Please try again later.',
+        ephemeral: true
+      });
     }
 
     const embed = new EmbedBuilder()
@@ -85,30 +92,35 @@ export class LeaderboardCommand extends Command {
       .setColor('#FFD700')
       .setTimestamp();
 
-    return interaction.reply({ embeds: [embed] });
+    return interaction.editReply({ embeds: [embed] });
   }
 
   async formatWealthLeaderboard(users, client) {
-    let description = '';
-    for (let i = 0; i < users.length; i++) {
-      const user = users[i];
-      const discordUser = await client.users.fetch(user.id);
-      const total = user.wallet + user.bank;
-      description += `${i + 1}. ${discordUser.username}\n`;
-      description += `   💵 Total: $${total.toLocaleString()}\n`;
-      description += `   (Wallet: $${user.wallet.toLocaleString()} | Bank: $${user.bank.toLocaleString()})\n\n`;
-    }
-    return description || 'No users found';
+    const lines = await Promise.all(
+      users.map(async (user, i) => {
+        try {
+          const discordUser = await client.users.fetch(user.id);
+          const total = user.wallet + user.bank;
+          return `${i + 1}. ${discordUser.username}\n   💵 Total: $${total.toLocaleString()} (Wallet: $${user.wallet.toLocaleString()} | Bank: $${user.bank.toLocaleString()})\n`;
+        } catch {
+          return `${i + 1}. [Unknown User]\n   💵 Total: $${(user.wallet + user.bank).toLocaleString()} (Wallet: $${user.wallet.toLocaleString()} | Bank: $${user.bank.toLocaleString()})\n`;
+        }
+      })
+    );
+    return lines.join('\n') || 'No users found';
   }
 
   async formatWinLossLeaderboard(users, client, field) {
-    let description = '';
-    for (let i = 0; i < users.length; i++) {
-      const user = users[i];
-      const discordUser = await client.users.fetch(user.id);
-      description += `${i + 1}. ${discordUser.username}\n`;
-      description += `   💵 ${field === 'totalWon' ? 'Won' : 'Lost'}: $${user[field].toLocaleString()}\n\n`;
-    }
-    return description || 'No users found';
+    const lines = await Promise.all(
+      users.map(async (user, i) => {
+        try {
+          const discordUser = await client.users.fetch(user.id);
+          return `${i + 1}. ${discordUser.username}\n   💵 ${field === 'totalWon' ? 'Won' : 'Lost'}: $${user[field].toLocaleString()}\n`;
+        } catch {
+          return `${i + 1}. [Unknown User]\n   💵 ${field === 'totalWon' ? 'Won' : 'Lost'}: $${user[field].toLocaleString()}\n`;
+        }
+      })
+    );
+    return lines.join('\n') || 'No users found';
   }
-} 
+}

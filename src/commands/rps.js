@@ -39,14 +39,27 @@ export class RPSCommand extends Command {
     );
   }
 
+  // Define the getUser function to check if the user is registered
+  async getUser(userId) {
+    return await prisma.user.findUnique({
+      where: { id: userId }
+    });
+  }
+
   async chatInputRun(interaction) {
     const bet = interaction.options.getInteger('bet');
     const opponent = interaction.options.getUser('opponent');
-    const user = await prisma.user.findUnique({
-      where: { id: interaction.user.id }
-    });
+    
+    // Check if the user is registered
+    const user = await this.getUser(interaction.user.id);
+    if (!user) {
+      return interaction.reply({
+        content: 'You need to register first!',
+        ephemeral: true,
+      });
+    }
 
-    if (!user || user.wallet < bet) {
+    if (user.wallet < bet) {
       return interaction.reply('Insufficient funds in wallet!');
     }
 
@@ -123,12 +136,16 @@ ${result === 'win' ? `You won $${winnings}!` : result === 'lose' ? 'You lost!' :
       return interaction.reply('You cannot challenge yourself!');
     }
 
-    const opponentUser = await prisma.user.findUnique({
-      where: { id: opponent.id }
-    });
+    // Check if both users are registered
+    const user = await this.getUser(interaction.user.id);
+    const opponentUser = await this.getUser(opponent.id);
 
-    if (!opponentUser || opponentUser.wallet < bet) {
-      return interaction.reply('Your opponent has insufficient funds!');
+    if (!user || !opponentUser) {
+      return interaction.reply('Both players need to be registered first!');
+    }
+
+    if (user.wallet < bet || opponentUser.wallet < bet) {
+      return interaction.reply('One or both players have insufficient funds!');
     }
 
     const buttons = CHOICES.map(choice => 
@@ -232,4 +249,4 @@ ${result === 'win' ? `${interaction.user} wins $${bet}!` :
     }
     return 'lose';
   }
-} 
+}

@@ -44,7 +44,10 @@ export class TransferCommand extends Command {
     });
 
     if (!user) {
-      return interaction.reply('You need to register first! Use /register');
+      return interaction.reply({
+        content: 'You need to register first!',
+        ephemeral: true,
+      });
     }
 
     if (type === 'toBank') {

@@ -91,7 +91,17 @@ export class LotteryCommand extends Command {
 
     async chatInputRun(interaction) {
         const subcommand = interaction.options.getSubcommand();
-        
+
+        // Get user data from the database
+        const user = await getUser(interaction.user.id);
+
+        if (!user) {
+            return interaction.reply({
+                content: 'You need to register first!',
+                ephemeral: true,
+            });
+        }
+
         try {
             await interaction.deferReply({ ephemeral: subcommand !== 'info' && subcommand !== 'create' && subcommand !== 'draw' });
 

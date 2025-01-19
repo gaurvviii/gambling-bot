@@ -47,14 +47,28 @@ export class RouletteCommand extends Command {
     );
   }
 
+  // Define the getUser function to check if the user is registered
+  async getUser(userId) {
+    return await prisma.user.findUnique({
+      where: { id: userId }
+    });
+  }
+
   async chatInputRun(interaction) {
+    const userId = interaction.user.id;
+    
+    // Check if the user is registered
+    const user = await this.getUser(userId);
+    if (!user) {
+      return interaction.reply({
+        content: 'You need to register first!',
+        ephemeral: true,
+      });
+    }
+    
     const bet = interaction.options.getInteger('bet');
     const type = interaction.options.getString('type');
     const choice = interaction.options.getString('choice').toLowerCase();
-
-    const user = await prisma.user.findUnique({
-      where: { id: interaction.user.id }
-    });
 
     if (bet > user.wallet) {
       return interaction.reply('Insufficient funds in wallet!');
@@ -123,4 +137,4 @@ Your bet: ${bet} on ${choice}
 ${won ? `You won $${winnings}!` : 'You lost!'}
     `);
   }
-} 
+}

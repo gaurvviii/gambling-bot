@@ -33,7 +33,10 @@ export class SlotsCommand extends Command {
     });
 
     if (!user) {
-      return interaction.reply('You need to create an account first!');
+      return interaction.reply({
+        content: 'You need to register first!',
+        ephemeral: true,
+      });
     }
 
     if (bet > user.wallet) {

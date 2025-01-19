@@ -54,7 +54,7 @@ export class BankCommand extends Command {
 
       if (!user) {
         return interaction.reply({
-          content: 'You need to create an account first!',
+          content: 'You need to register first!',
           ephemeral: true,
         });
       }

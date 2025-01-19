@@ -1,5 +1,6 @@
 import { Command } from '@sapphire/framework';
 import { prisma } from '../lib/database.js';
+import { getUser } from '../lib/user.js'; 
 
 export class CoinflipCommand extends Command {
   constructor(context, options) {
@@ -36,56 +37,73 @@ export class CoinflipCommand extends Command {
   }
 
   async chatInputRun(interaction) {
-    const bet = interaction.options.getInteger('bet');
-    const choice = interaction.options.getString('choice');
-    
-    const user = await prisma.user.findUnique({
-      where: { id: interaction.user.id }
-    });
+    try {
+      const bet = interaction.options.getInteger('bet');
+      const choice = interaction.options.getString('choice');
+      const userId = interaction.user.id;
 
-    if (!user) {
-      return interaction.reply('You need to create an account first!');
-    }
+      // Use getUser to fetch or create the user
+      const user = await getUser(userId);
 
-    if (bet > user.wallet) {
-      return interaction.reply('Insufficient funds in wallet!');
-    }
-
-    // Deduct bet first
-    await prisma.user.update({
-      where: { id: interaction.user.id },
-      data: {
-        wallet: { decrement: bet }
+      if (!user) {
+        return interaction.reply({
+          content: 'You need to register first!',
+          ephemeral: true
+        });
       }
-    });
 
-    const result = Math.random() < 0.5 ? 'heads' : 'tails';
-    const won = choice === result;
-    const winnings = won ? bet * 2 : 0;
+      if (bet > user.wallet) {
+        return interaction.reply({
+          content: 'Insufficient funds in wallet!',
+          ephemeral: true
+        });
+      }
 
-    // Update balance based on result
-    if (won) {
+      // Deduct the bet amount
       await prisma.user.update({
-        where: { id: interaction.user.id },
+        where: { id: userId },
         data: {
-          wallet: { increment: winnings },
-          totalWon: { increment: winnings - bet }
+          wallet: { decrement: bet }
         }
       });
-    } else {
-      await prisma.user.update({
-        where: { id: interaction.user.id },
-        data: {
-          totalLost: { increment: bet }
-        }
+
+      // Simulate the coin flip
+      const result = Math.random() < 0.5 ? 'heads' : 'tails';
+      const won = choice === result;
+      const winnings = won ? bet * 2 : 0;
+
+      // Update the user's wallet based on the result
+      if (won) {
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            wallet: { increment: winnings },
+            totalWon: { increment: winnings - bet }
+          }
+        });
+      } else {
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            totalLost: { increment: bet }
+          }
+        });
+      }
+
+      // Respond with the result
+      await interaction.reply(`
+🎲 **Coinflip Result** 🎲
+You chose: **${choice}**
+Result: **${result}**
+${won ? `🎉 You won **$${winnings}**!` : '😢 You lost!'}
+      `);
+    } catch (error) {
+      console.error('Error in CoinflipCommand:', error);
+      await interaction.reply({
+        content: 'An error occurred while processing your request. Please try again later.',
+        ephemeral: true
       });
     }
-
-    await interaction.reply(`
-🎲 Coinflip Result 🎲
-You chose: ${choice}
-Result: ${result}
-${won ? `You won $${winnings}!` : 'You lost!'}
-    `);
   }
 }
+

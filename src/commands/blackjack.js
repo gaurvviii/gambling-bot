@@ -33,16 +33,19 @@ export class BlackjackCommand extends Command {
 
   async chatInputRun(interaction) {
     try {
+      // Defer the reply immediately to prevent interaction timeout
+      await interaction.deferReply();
+
       const userId = interaction.user.id;
       if (games.has(userId)) {
-        return interaction.reply('You already have a game in progress!');
+        return interaction.editReply('You already have a game in progress!');
       }
 
       const bet = interaction.options.getInteger('bet');
       const user = await getUser(userId);
 
       if (user.wallet < bet) {
-        return interaction.reply('Insufficient funds in wallet!');
+        return interaction.editReply('Insufficient funds in wallet!');
       }
 
       // Deduct bet amount
@@ -68,54 +71,81 @@ export class BlackjackCommand extends Command {
           .setStyle(ButtonStyle.Secondary)
       );
 
-      const response = await interaction.reply({
+      const response = await interaction.editReply({
         content: this.getGameState(game),
         components: [buttons]
       });
 
       const collector = response.createMessageComponentCollector({
         componentType: ComponentType.Button,
-        time: 30000
+        time: 20000 // Reduced from 30000 to 20000
       });
 
       collector.on('collect', async (i) => {
-        if (i.user.id !== userId) {
-          return i.reply({ content: 'This is not your game!', ephemeral: true });
-        }
-
-        const gameData = games.get(userId);
-        const game = gameData.game;
-
-        if (i.customId === 'hit') {
-          game.hit(game.playerHand);
-          const playerValue = game.getHandValue(game.playerHand);
-
-          if (playerValue > 21) {
-            await this.endGame(i, game, userId, 'bust');
-            collector.stop();
-          } else {
-            await i.update({ content: this.getGameState(game), components: [buttons] });
+        try {
+          if (i.user.id !== userId) {
+            return i.reply({ content: 'This is not your game!', ephemeral: true });
           }
-        } else if (i.customId === 'stand') {
-          game.dealerPlay();
-          const result = this.determineWinner(game);
-          await this.endGame(i, game, userId, result);
+
+          const gameData = games.get(userId);
+          if (!gameData) {
+            return i.update({ content: 'This game has expired.', components: [] });
+          }
+
+          const game = gameData.game;
+
+          if (i.customId === 'hit') {
+            game.hit(game.playerHand);
+            const playerValue = game.getHandValue(game.playerHand);
+
+            if (playerValue > 21) {
+              await this.endGame(i, game, userId, 'bust');
+              collector.stop();
+            } else {
+              await i.update({ content: this.getGameState(game), components: [buttons] });
+            }
+          } else if (i.customId === 'stand') {
+            game.dealerPlay();
+            const result = this.determineWinner(game);
+            await this.endGame(i, game, userId, result);
+            collector.stop();
+          }
+        } catch (error) {
+          console.error('Error in button interaction:', error);
+          try {
+            await i.update({ content: 'An error occurred. The game has been cancelled.', components: [] });
+          } catch (updateError) {
+            console.error('Error updating interaction:', updateError);
+          }
+          games.delete(userId);
           collector.stop();
         }
       });
 
-      collector.on('end', (_, reason) => {
+      collector.on('end', async (_, reason) => {
         if (reason === 'time') {
-          interaction.editReply({
-            content: 'Game expired due to inactivity!',
-            components: []
-          });
+          try {
+            await interaction.editReply({
+              content: 'Game expired due to inactivity!',
+              components: []
+            });
+          } catch (error) {
+            console.error('Error updating expired game:', error);
+          }
           games.delete(userId);
         }
       });
     } catch (error) {
       console.error('Error occurred in BlackjackCommand:', error);
-      return interaction.reply('An error occurred while processing your request. Please try again later.');
+      try {
+        if (!interaction.deferred && !interaction.replied) {
+          await interaction.reply('An error occurred while processing your request. Please try again later.');
+        } else {
+          await interaction.editReply('An error occurred while processing your request. Please try again later.');
+        }
+      } catch (replyError) {
+        console.error('Error sending error message:', replyError);
+      }
     }
   }
 
@@ -153,48 +183,62 @@ Your value: ${game.getHandValue(game.playerHand)}
   }
 
   async endGame(interaction, game, userId, result) {
-    const gameData = games.get(userId);
-    const bet = gameData.bet;
-    let winnings = 0;
+    try {
+      const gameData = games.get(userId);
+      if (!gameData) return;
 
-    if (result === 'win') {
-      winnings = bet * 2;
-      await prisma.user.update({
-        where: { id: userId },
-        data: {
-          wallet: { increment: winnings },
-          totalWon: { increment: winnings - bet }
-        }
-      });
-    } else if (result === 'push') {
-      // Return the original bet for a push
-      await prisma.user.update({
-        where: { id: userId },
-        data: {
-          wallet: { increment: bet }
-        }
-      });
-    } else {
-      await prisma.user.update({
-        where: { id: userId },
-        data: {
-          totalLost: { increment: bet }
-        }
-      });
-    }
+      const bet = gameData.bet;
+      let winnings = 0;
 
-    const resultMessage = `
+      if (result === 'win') {
+        winnings = bet * 2;
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            wallet: { increment: winnings },
+            totalWon: { increment: winnings - bet }
+          }
+        });
+      } else if (result === 'push') {
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            wallet: { increment: bet }
+          }
+        });
+      } else {
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            totalLost: { increment: bet }
+          }
+        });
+      }
+
+      const resultMessage = `
 ${this.getFinalGameState(game)}
 ${result === 'win' ? `You won $${winnings}!` : 
   result === 'push' ? 'Push! Your bet has been returned.' : 
   'You lost!'}
-    `;
+      `;
 
-    await interaction.update({
-      content: resultMessage,
-      components: []
-    });
+      await interaction.update({
+        content: resultMessage,
+        components: []
+      });
 
-    games.delete(userId);
+      games.delete(userId);
+    } catch (error) {
+      console.error('Error in endGame:', error);
+      try {
+        await interaction.update({
+          content: 'An error occurred while ending the game.',
+          components: []
+        });
+      } catch (updateError) {
+        console.error('Error updating end game message:', updateError);
+      }
+      games.delete(userId);
+    }
   }
 }

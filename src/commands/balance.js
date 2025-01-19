@@ -19,17 +19,20 @@ export class BalanceCommand extends Command {
   }
 
   async chatInputRun(interaction) {
+    // Defer the reply immediately to prevent interaction expiration
+    await interaction.deferReply();
+
     try {
       const user = await getUser(interaction.user.id);
 
       if (!user) {
-        return interaction.reply('You need to register first! Use /register');
+        return interaction.editReply('You need to register first! Use /register');
       }
 
-      return interaction.reply(`💰 Your Balance 💰\nWallet: $${user.wallet}\nBank: $${user.bank}\nTotal: $${user.wallet + user.bank}`);
+      return interaction.editReply(`💰 Your Balance 💰\nWallet: $${user.wallet}\nBank: $${user.bank}\nTotal: $${user.wallet + user.bank}`);
     } catch (error) {
       console.error('Error occurred in BalanceCommand:', error);
-      return interaction.reply('An error occurred while fetching your balance. Please try again later.');
+      return interaction.editReply('An error occurred while fetching your balance. Please try again later.');
     }
   }
-} 
+}

@@ -52,7 +52,14 @@ export class BaccaratCommand extends Command {
     const user = await prisma.user.findUnique({
       where: { id: interaction.user.id }
     });
-
+    
+    if (!user) {
+      return interaction.reply({
+        content: 'You need to register first!',
+        ephemeral: true,
+      });
+    }
+    
     if (bet > user.wallet) {
       return interaction.reply('Insufficient funds in wallet!');
     }

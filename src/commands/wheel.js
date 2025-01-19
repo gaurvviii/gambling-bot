@@ -39,7 +39,13 @@ export class WheelCommand extends Command {
     const user = await prisma.user.findUnique({
       where: { id: interaction.user.id }
     });
-
+    
+    if (!user) {
+      return interaction.reply({
+        content: 'You need to register first!',
+        ephemeral: true,
+      });
+    }
     if (!user || user.wallet < bet) {
       return interaction.editReply('Insufficient funds in wallet!');
     }

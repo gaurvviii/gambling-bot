@@ -38,7 +38,7 @@ export class FixBalanceCommand extends Command {
 
   async chatInputRun(interaction) {
     // Check if user is admin
-    if (!interaction.member.permissions.has('ADMINISTRATOR')) {
+    if (!interaction.member.permissions.has('ADMIN')) {
       return interaction.reply({
         content: '❌ Only administrators can use this command!',
         ephemeral: true
