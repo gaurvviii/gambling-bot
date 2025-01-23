@@ -46,89 +46,96 @@ export class BaccaratCommand extends Command {
   }
 
   async chatInputRun(interaction) {
-    const bet = interaction.options.getInteger('bet');
-    const position = interaction.options.getString('position');
+    await interaction.deferReply();
 
-    // Get or create user automatically
-    let user = await prisma.user.findUnique({
-      where: { id: interaction.user.id }
-    });
+    try {
+      const bet = interaction.options.getInteger('bet');
+      const position = interaction.options.getString('position');
 
-    // Auto-register if user doesn't exist
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          id: interaction.user.id,
-          wallet: 0,
-          bank: 1000,
-          hoursEarned: 0
-        }
+      // Get or create user automatically
+      let user = await prisma.user.findUnique({
+        where: { id: interaction.user.id }
       });
-    }
-    
-    if (bet > user.wallet) {
-      return interaction.reply('Insufficient funds in wallet!');
-    }
 
-    // Initial deal
-    const playerHand = [this.drawCard(), this.drawCard()];
-    const bankerHand = [this.drawCard(), this.drawCard()];
-    let playerTotal = this.calculateTotal(playerHand);
-    let bankerTotal = this.calculateTotal(bankerHand);
+      // Auto-register if user doesn't exist
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            id: interaction.user.id,
+            wallet: 0,
+            bank: 1000,
+            hoursEarned: 0
+          }
+        });
+      }
+      
+      if (bet > user.wallet) {
+        return interaction.editReply('Insufficient funds in wallet!');
+      }
 
-    // Third card rules
-    if (playerTotal < 8 && bankerTotal < 8) {
-      // Player's third card
-      if (playerTotal <= 5) {
-        const thirdCard = this.drawCard();
-        playerHand.push(thirdCard);
-        playerTotal = this.calculateTotal(playerHand);
+      // Initial deal
+      const playerHand = [this.drawCard(), this.drawCard()];
+      const bankerHand = [this.drawCard(), this.drawCard()];
+      let playerTotal = this.calculateTotal(playerHand);
+      let bankerTotal = this.calculateTotal(bankerHand);
 
-        // Banker's third card rules
-        if (bankerTotal <= 2 || 
-            (bankerTotal === 3 && thirdCard !== 8) ||
-            (bankerTotal === 4 && [2,3,4,5,6,7].includes(thirdCard)) ||
-            (bankerTotal === 5 && [4,5,6,7].includes(thirdCard)) ||
-            (bankerTotal === 6 && [6,7].includes(thirdCard))) {
+      // Third card rules
+      if (playerTotal < 8 && bankerTotal < 8) {
+        // Player's third card
+        if (playerTotal <= 5) {
+          const thirdCard = this.drawCard();
+          playerHand.push(thirdCard);
+          playerTotal = this.calculateTotal(playerHand);
+
+          // Banker's third card rules
+          if (bankerTotal <= 2 || 
+              (bankerTotal === 3 && thirdCard !== 8) ||
+              (bankerTotal === 4 && [2,3,4,5,6,7].includes(thirdCard)) ||
+              (bankerTotal === 5 && [4,5,6,7].includes(thirdCard)) ||
+              (bankerTotal === 6 && [6,7].includes(thirdCard))) {
+            bankerHand.push(this.drawCard());
+            bankerTotal = this.calculateTotal(bankerHand);
+          }
+        } else if (bankerTotal <= 5) {
           bankerHand.push(this.drawCard());
           bankerTotal = this.calculateTotal(bankerHand);
         }
-      } else if (bankerTotal <= 5) {
-        bankerHand.push(this.drawCard());
-        bankerTotal = this.calculateTotal(bankerHand);
       }
-    }
 
-    // Determine winner
-    let result;
-    if (playerTotal === bankerTotal) result = 'tie';
-    else if (playerTotal > bankerTotal) result = 'player';
-    else result = 'banker';
+      // Determine winner
+      let result;
+      if (playerTotal === bankerTotal) result = 'tie';
+      else if (playerTotal > bankerTotal) result = 'player';
+      else result = 'banker';
 
-    // Calculate winnings
-    let winnings = 0;
-    if (position === result) {
-      if (position === 'player') winnings = bet * 2;
-      else if (position === 'banker') winnings = bet * 1.95;
-      else if (position === 'tie') winnings = bet * 9;
-    }
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        wallet: { increment: winnings - bet },
-        totalWon: { increment: winnings > bet ? winnings - bet : 0 },
-        totalLost: { increment: winnings > bet ? 0 : bet }
+      // Calculate winnings
+      let winnings = 0;
+      if (position === result) {
+        if (position === 'player') winnings = bet * 2;
+        else if (position === 'banker') winnings = bet * 1.95;
+        else if (position === 'tie') winnings = bet * 9;
       }
-    });
 
-    return interaction.reply(`
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          wallet: { increment: winnings - bet },
+          totalWon: { increment: winnings > bet ? winnings - bet : 0 },
+          totalLost: { increment: winnings > bet ? 0 : bet }
+        }
+      });
+
+      return interaction.editReply(`
 🎴 Baccarat Result 🎴
 Player's Hand: ${playerHand.join(', ')} (Total: ${playerTotal})
 Banker's Hand: ${bankerHand.join(', ')} (Total: ${bankerTotal})
 Winner: ${result.toUpperCase()}
 Your bet: ${bet} on ${position}
 ${winnings > 0 ? `You won $${winnings}!` : 'You lost!'}
-    `);
+      `);
+    } catch (error) {
+      console.error('Error in baccarat command:', error);
+      return interaction.editReply('An error occurred while processing your game. Please try again.');
+    }
   }
 }

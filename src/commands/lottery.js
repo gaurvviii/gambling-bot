@@ -1,6 +1,5 @@
 import { Command } from '@sapphire/framework';
 import { EmbedBuilder } from 'discord.js';
-import { ApplicationCommandOptionType } from 'discord-api-types/v9';
 import { prisma } from '../lib/database.js';
 import ROLE_IDS from '../config/roleIds.js';
 
@@ -9,13 +8,7 @@ export class LotteryCommand extends Command {
         super(context, {
             ...options,
             name: 'lottery',
-            description: 'Manage lotteries in the server',
-            chatInputCommand: {
-                register: true,
-                idHints: ['lottery-command'],
-                behaviorWhenNotIdentical: 'overwrite',
-                guildIds: [],
-            },
+            description: 'Manage lotteries in the server'
         });
     }
 
@@ -89,34 +82,31 @@ export class LotteryCommand extends Command {
     }
 
     async chatInputRun(interaction) {
-        const subcommand = interaction.options.getSubcommand();
-
-        // Get or create user automatically
-        let user = await prisma.user.findUnique({
-            where: { id: interaction.user.id }
-        });
-
-        // Auto-register if user doesn't exist
-        if (!user) {
-            user = await prisma.user.create({
-                data: {
-                    id: interaction.user.id,
-                    wallet: 0,
-                    bank: 1000,
-                    hoursEarned: 0
-                }
-            });
-        }
-
         try {
-            await interaction.deferReply({ ephemeral: subcommand !== 'info' && subcommand !== 'create' && subcommand !== 'draw' });
+            await interaction.deferReply({ ephemeral: false });
+
+            const subcommand = interaction.options.getSubcommand(true);
+
+            // Get or create user automatically
+            let user = await prisma.user.findUnique({
+                where: { id: interaction.user.id }
+            });
+
+            // Auto-register if user doesn't exist
+            if (!user) {
+                user = await prisma.user.create({
+                    data: {
+                        id: interaction.user.id,
+                        wallet: 0,
+                        bank: 1000,
+                        hoursEarned: 0
+                    }
+                });
+            }
 
             if (subcommand === 'create' || subcommand === 'draw') {
                 if (!interaction.member.roles.cache.has(ROLE_IDS.ADMIN)) {
-                    return interaction.editReply({
-                        content: '❌ This command is only available to administrators!',
-                        flags: ['Ephemeral']
-                    });
+                    return interaction.editReply('❌ This command is only available to administrators!');
                 }
             }
 
@@ -133,14 +123,12 @@ export class LotteryCommand extends Command {
                 case 'buy':
                     await this.buyTicket(interaction);
                     break;
+                default:
+                    return interaction.editReply('❌ Invalid subcommand!');
             }
         } catch (error) {
-            console.error(`Error in lottery command (${subcommand}):`, error);
-            const reply = interaction.deferred ? interaction.editReply : interaction.reply;
-            await reply.call(interaction, {
-                content: 'An error occurred while processing your command. Please try again later.',
-                flags: ['Ephemeral']
-            }).catch(() => {});
+            console.error(`Error in lottery command:`, error);
+            return interaction.editReply('An error occurred while processing your command. Please try again later.');
         }
     }
 
@@ -183,24 +171,15 @@ export class LotteryCommand extends Command {
         });
 
         if (!lottery) {
-            return interaction.editReply({
-                content: '❌ This lottery does not exist.',
-                flags: ['Ephemeral']
-            });
+            return interaction.editReply('❌ This lottery does not exist.');
         }
 
         if (!lottery.active) {
-            return interaction.editReply({
-                content: '❌ This lottery has already been drawn.',
-                flags: ['Ephemeral']
-            });
+            return interaction.editReply('❌ This lottery has already been drawn.');
         }
 
         if (lottery.endTime > new Date()) {
-            return interaction.editReply({
-                content: '❌ This lottery has not ended yet.',
-                flags: ['Ephemeral']
-            });
+            return interaction.editReply('❌ This lottery has not ended yet.');
         }
 
         if (lottery.tickets.length === 0) {
@@ -209,28 +188,24 @@ export class LotteryCommand extends Command {
                 data: { active: false },
             });
 
-            return interaction.editReply({
-                content: '❌ No tickets were purchased for this lottery. The lottery has been closed.',
-                flags: ['Ephemeral']
-            });
+            return interaction.editReply('❌ No tickets were purchased for this lottery. The lottery has been closed.');
         }
 
         const winnerTicket = lottery.tickets[Math.floor(Math.random() * lottery.tickets.length)];
 
-        await prisma.$transaction(async (prisma) => {
-            await prisma.lottery.update({
+        await prisma.$transaction([
+            prisma.lottery.update({
                 where: { id: lotteryId },
                 data: { 
                     active: false,
-                    winnerId: winnerTicket.userId
+                    winner: winnerTicket.userId
                 },
-            });
-
-            await prisma.user.update({
+            }),
+            prisma.user.update({
                 where: { id: winnerTicket.userId },
                 data: { wallet: { increment: lottery.prize } },
-            });
-        });
+            })
+        ]);
 
         const embed = new EmbedBuilder()
             .setTitle('🎉 Lottery Winner Drawn!')
@@ -253,10 +228,7 @@ export class LotteryCommand extends Command {
         });
 
         if (activeLotteries.length === 0) {
-            return interaction.editReply({
-                content: '❌ There are no active lotteries at the moment.',
-                flags: ['Ephemeral']
-            });
+            return interaction.editReply('❌ There are no active lotteries at the moment.');
         }
 
         const embed = new EmbedBuilder()
@@ -296,10 +268,7 @@ export class LotteryCommand extends Command {
         });
 
         if (!lottery || !lottery.active) {
-            return interaction.editReply({
-                content: '❌ This lottery does not exist or has ended.',
-                flags: ['Ephemeral']
-            });
+            return interaction.editReply('❌ This lottery does not exist or has ended.');
         }
 
         const totalCost = lottery.ticketPrice * amount;
@@ -308,10 +277,7 @@ export class LotteryCommand extends Command {
         });
 
         if (user.wallet < totalCost) {
-            return interaction.editReply({
-                content: `❌ Insufficient funds! You need ${totalCost} coins to buy ${amount} ticket${amount > 1 ? 's' : ''}.`,
-                flags: ['Ephemeral']
-            });
+            return interaction.editReply(`❌ Insufficient funds! You need ${totalCost} coins to buy ${amount} ticket${amount > 1 ? 's' : ''}.`);
         }
 
         await prisma.$transaction(async (prisma) => {

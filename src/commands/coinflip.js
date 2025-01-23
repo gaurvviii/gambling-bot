@@ -36,6 +36,8 @@ export class CoinflipCommand extends Command {
   }
 
   async chatInputRun(interaction) {
+    await interaction.deferReply();
+
     try {
       const bet = interaction.options.getInteger('bet');
       const choice = interaction.options.getString('choice');
@@ -59,10 +61,7 @@ export class CoinflipCommand extends Command {
       }
 
       if (bet > user.wallet) {
-        return interaction.reply({
-          content: 'Insufficient funds in wallet!',
-          ephemeral: true
-        });
+        return interaction.editReply('Insufficient funds in wallet!');
       }
 
       // Deduct the bet amount
@@ -97,7 +96,7 @@ export class CoinflipCommand extends Command {
       }
 
       // Respond with the result
-      await interaction.reply(`
+      return interaction.editReply(`
 🎲 **Coinflip Result** 🎲
 You chose: **${choice}**
 Result: **${result}**
@@ -105,11 +104,7 @@ ${won ? `🎉 You won **$${winnings}**!` : '😢 You lost!'}
       `);
     } catch (error) {
       console.error('Error in CoinflipCommand:', error);
-      await interaction.reply({
-        content: 'An error occurred while processing your request. Please try again later.',
-        ephemeral: true
-      });
+      return interaction.editReply('An error occurred while processing your request. Please try again later.');
     }
   }
 }
-

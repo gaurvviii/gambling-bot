@@ -28,7 +28,7 @@ client.once('ready', async () => {
     console.log(`Current commands: ${commands?.size ?? 0}`);
 
     // Force register commands to your server
-    const guild = await client.guilds.fetch('1138879497341522043'); // your server ID
+    const guild = await client.guilds.fetch('1325400597117009971'); // your server ID
     const guildCommands = await guild.commands.set([
       {
         name: 'slots',
@@ -71,20 +71,12 @@ client.once('ready', async () => {
         description: 'Manage your bank account'
       },
       {
-        name: 'balance',
-        description: 'Check your wallet and bank balance'
-      },
-      {
         name: 'transfer',
         description: 'Transfer money between bank and wallet'
       },
       {
         name: 'salary',
         description: 'View and claim your salary'
-      },
-      {
-        name: 'lottery',
-        description: 'Participate in server lottery'
       },
       {
         name: 'leaderboard',

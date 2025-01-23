@@ -26,74 +26,81 @@ export class SlotsCommand extends Command {
   }
 
   async chatInputRun(interaction) {
-    const bet = interaction.options.getInteger('bet');
-    
-    // Get or create user automatically
-    let user = await prisma.user.findUnique({
-      where: { id: interaction.user.id }
-    });
+    await interaction.deferReply();
 
-    // Auto-register if user doesn't exist
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          id: interaction.user.id,
-          wallet: 0,
-          bank: 1000,
-          hoursEarned: 0
-        }
+    try {
+      const bet = interaction.options.getInteger('bet');
+      
+      // Get or create user automatically
+      let user = await prisma.user.findUnique({
+        where: { id: interaction.user.id }
       });
-    }
 
-    if (bet > user.wallet) {
-      return interaction.reply('Insufficient funds in wallet!');
-    }
-
-    // Deduct bet first
-    await prisma.user.update({
-      where: { id: interaction.user.id },
-      data: {
-        wallet: { decrement: bet }
+      // Auto-register if user doesn't exist
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            id: interaction.user.id,
+            wallet: 0,
+            bank: 1000,
+            hoursEarned: 0
+          }
+        });
       }
-    });
 
-    const symbols = ['🍒', '🍊', '🍋', '🍇', '💎', '7️⃣'];
-    const result = Array(3)
-      .fill(0)
-      .map(() => symbols[Math.floor(Math.random() * symbols.length)]);
+      if (bet > user.wallet) {
+        return interaction.editReply('Insufficient funds in wallet!');
+      }
 
-    let winnings = 0;
-    if (result[0] === result[1] && result[1] === result[2]) {
-      winnings = bet * 5;
-    } else if (result[0] === result[1] || result[1] === result[2]) {
-      winnings = bet * 2;
-    }
-
-    // Update balance based on result
-    if (winnings > 0) {
+      // Deduct bet first
       await prisma.user.update({
         where: { id: interaction.user.id },
         data: {
-          wallet: { increment: winnings },
-          totalWon: { increment: winnings - bet }
+          wallet: { decrement: bet }
         }
       });
-    } else {
-      await prisma.user.update({
-        where: { id: interaction.user.id },
-        data: {
-          totalLost: { increment: bet }
-        }
-      });
-    }
 
-    const resultMessage = `
+      const symbols = ['🍒', '🍊', '🍋', '🍇', '💎', '7️⃣'];
+      const result = Array(3)
+        .fill(0)
+        .map(() => symbols[Math.floor(Math.random() * symbols.length)]);
+
+      let winnings = 0;
+      if (result[0] === result[1] && result[1] === result[2]) {
+        winnings = bet * 5;
+      } else if (result[0] === result[1] || result[1] === result[2]) {
+        winnings = bet * 2;
+      }
+
+      // Update balance based on result
+      if (winnings > 0) {
+        await prisma.user.update({
+          where: { id: interaction.user.id },
+          data: {
+            wallet: { increment: winnings },
+            totalWon: { increment: winnings - bet }
+          }
+        });
+      } else {
+        await prisma.user.update({
+          where: { id: interaction.user.id },
+          data: {
+            totalLost: { increment: bet }
+          }
+        });
+      }
+
+      const resultMessage = `
 🎰 SLOTS 🎰
 ═══════════
 ║ ${result.join(' | ')} ║
 ═══════════
 ${winnings > 0 ? `You won $${winnings}!` : 'You lost!'}`;
 
-    await interaction.reply(resultMessage);
+      return interaction.editReply(resultMessage);
+    } catch (error) {
+      console.error('Error in slots command:', error);
+      return interaction.editReply('An error occurred while processing your game. Please try again.');
+    }
   }
 }
