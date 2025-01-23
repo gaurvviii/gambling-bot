@@ -22,59 +22,69 @@ export class SalaryCommand extends Command {
   }
 
   async chatInputRun(interaction) {
-    try {
-      await interaction.deferReply();
+try {
+  await interaction.deferReply();
 
-      const now = new Date();
-      const dayOfWeek = now.getDay();
+  // Check if command is used in a guild
+  if (!interaction.inGuild()) {
+    return interaction.editReply('⚠️ This command can only be used in a server, not in DMs.');
+  }
 
-      // Check if it's weekend
-      if (dayOfWeek === 0 || dayOfWeek === 6) {
-        return interaction.editReply('⚠️ Salary earning is paused during weekends (Saturday and Sunday)');
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+
+  // Check if it's weekend
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
+    return interaction.editReply('⚠️ Salary earning is paused during weekends (Saturday and Sunday)');
+  }
+
+  // Get or create user automatically
+  let user = await prisma.user.findUnique({
+    where: { id: interaction.user.id }
+  });
+
+  // Auto-register if user doesn't exist
+  if (!user) {
+    user = await prisma.user.create({
+      data: {
+        id: interaction.user.id,
+        wallet: 0,
+        bank: 1000,
+        hoursEarned: 0,
+        lastEarningStart: now
       }
+    });
+  }
 
-      // Get or create user automatically
-      let user = await prisma.user.findUnique({
-        where: { id: interaction.user.id }
-      });
+  // Safely get member and check roles
+  const member = await interaction.guild?.members.fetch(interaction.user.id);
+  if (!member) {
+    return interaction.editReply('⚠️ Unable to fetch your member information. Please try again.');
+  }
 
-      // Auto-register if user doesn't exist
-      if (!user) {
-        user = await prisma.user.create({
-          data: {
-            id: interaction.user.id,
-            wallet: 0,
-            bank: 1000,
-            hoursEarned: 0,
-            lastEarningStart: now
-          }
-        });
-      }
+  let roleKey = 'MEMBER';
+  let highestRole = 'Basic Member';
 
-      const member = interaction.member;
-      let roleKey = 'MEMBER';
-      let highestRole = 'Basic Member';
-
-      // Check roles from highest to lowest priority
-      if (member.roles.cache.has(ROLE_IDS.ZYZZ_GOD)) {
-        roleKey = 'ZYZZ_GOD';
-        highestRole = 'Zyzz God';
-      } else if (member.roles.cache.has(ROLE_IDS.DONATOR_PLUS_PLUS)) {
-        roleKey = 'DONATOR_PLUS_PLUS';
-        highestRole = 'Donator++';
-      } else if (member.roles.cache.has(ROLE_IDS.DONATOR_PLUS)) {
-        roleKey = 'DONATOR_PLUS';
-        highestRole = 'Donator+';
-      } else if (member.roles.cache.has(ROLE_IDS.DONATOR)) {
-        roleKey = 'DONATOR';
-        highestRole = 'Donator';
-      } else if (member.roles.cache.has(ROLE_IDS.SERVER_BOOSTER)) {
-        roleKey = 'SERVER_BOOSTER';
-        highestRole = 'Server Booster';
-      } else if (member.roles.cache.has(ROLE_IDS.STAFF)) {
-        roleKey = 'STAFF';
-        highestRole = 'Staff Member';
-      }
+  // Check roles from highest to lowest priority
+  if (member.roles.cache.has(ROLE_IDS.ZYZZ_GOD)) {
+    roleKey = 'ZYZZ_GOD';
+    highestRole = 'Zyzz God';
+  } else if (member.roles.cache.has(ROLE_IDS.DONATOR_PLUS_PLUS)) {
+    roleKey = 'DONATOR_PLUS_PLUS';
+    highestRole = 'Donator++';
+  } else if (member.roles.cache.has(ROLE_IDS.DONATOR_PLUS)) {
+    roleKey = 'DONATOR_PLUS';
+    highestRole = 'Donator+';
+  } else if (member.roles.cache.has(ROLE_IDS.DONATOR)) {
+    roleKey = 'DONATOR';
+    highestRole = 'Donator';
+  } else if (member.roles.cache.has(ROLE_IDS.SERVER_BOOSTER)) {
+    roleKey = 'SERVER_BOOSTER';
+    highestRole = 'Server Booster';
+  } else if (member.roles.cache.has(ROLE_IDS.STAFF)) {
+    roleKey = 'STAFF';
+    highestRole = 'Staff Member';
+  }
 
       const role = ROLES[roleKey];
       const hourlyRate = role.hourlyRate;
