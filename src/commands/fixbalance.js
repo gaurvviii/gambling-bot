@@ -1,5 +1,6 @@
 import { Command } from '@sapphire/framework';
 import { prisma } from '../lib/database.js';
+import ROLE_IDS from '../config/roleIds.js';
 
 export class FixBalanceCommand extends Command {
   constructor(context, options) {
@@ -37,8 +38,8 @@ export class FixBalanceCommand extends Command {
   }
 
   async chatInputRun(interaction) {
-    // Check if user is admin
-    if (!interaction.member.permissions.has('ADMIN')) {
+    // Check if user has admin role
+    if (!interaction.member.roles.cache.has(ROLE_IDS.ADMIN)) {
       return interaction.reply({
         content: '❌ Only administrators can use this command!',
         ephemeral: true
@@ -50,6 +51,23 @@ export class FixBalanceCommand extends Command {
     const newWallet = interaction.options.getInteger('wallet');
 
     try {
+      // Get or create user automatically
+      let user = await prisma.user.findUnique({
+        where: { id: targetUser.id }
+      });
+
+      // Auto-register if user doesn't exist
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            id: targetUser.id,
+            wallet: 0,
+            bank: 1000,
+            hoursEarned: 0
+          }
+        });
+      }
+
       const updatedUser = await prisma.user.update({
         where: { id: targetUser.id },
         data: {
@@ -64,7 +82,8 @@ New Bank Balance: $${updatedUser.bank}
 New Wallet Balance: $${updatedUser.wallet}
       `);
     } catch (error) {
-      return interaction.reply('❌ Error fixing balance. Make sure the user is registered.');
+      console.error('Error in fixbalance command:', error);
+      return interaction.reply('❌ Error fixing balance. Please try again.');
     }
   }
-} 
+}

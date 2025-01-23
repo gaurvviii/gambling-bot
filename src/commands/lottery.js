@@ -3,7 +3,6 @@ import { EmbedBuilder } from 'discord.js';
 import { ApplicationCommandOptionType } from 'discord-api-types/v9';
 import { prisma } from '../lib/database.js';
 import ROLE_IDS from '../config/roleIds.js';
-import { getUser } from '../lib/user.js';
 
 export class LotteryCommand extends Command {
     constructor(context, options) {
@@ -92,13 +91,20 @@ export class LotteryCommand extends Command {
     async chatInputRun(interaction) {
         const subcommand = interaction.options.getSubcommand();
 
-        // Get user data from the database
-        const user = await getUser(interaction.user.id);
+        // Get or create user automatically
+        let user = await prisma.user.findUnique({
+            where: { id: interaction.user.id }
+        });
 
+        // Auto-register if user doesn't exist
         if (!user) {
-            return interaction.reply({
-                content: 'You need to register first!',
-                ephemeral: true,
+            user = await prisma.user.create({
+                data: {
+                    id: interaction.user.id,
+                    wallet: 0,
+                    bank: 1000,
+                    hoursEarned: 0
+                }
             });
         }
 
@@ -297,7 +303,9 @@ export class LotteryCommand extends Command {
         }
 
         const totalCost = lottery.ticketPrice * amount;
-        const user = await getUser(userId);
+        const user = await prisma.user.findUnique({
+            where: { id: userId }
+        });
 
         if (user.wallet < totalCost) {
             return interaction.editReply({

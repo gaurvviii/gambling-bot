@@ -30,7 +30,6 @@ export class CrashCommand extends Command {
 
   async chatInputRun(interaction) {
     try {
-      // Defer reply to prevent timeout
       await interaction.deferReply();
 
       const userId = interaction.user.id;
@@ -39,12 +38,22 @@ export class CrashCommand extends Command {
       }
 
       const bet = interaction.options.getInteger('bet');
-      const user = await prisma.user.findUnique({
+
+      // Get or create user automatically
+      let user = await prisma.user.findUnique({
         where: { id: userId }
       });
 
+      // Auto-register if user doesn't exist
       if (!user) {
-        return interaction.editReply('You do not have an account. Please register first.');
+        user = await prisma.user.create({
+          data: {
+            id: userId,
+            wallet: 0,
+            bank: 1000,
+            hoursEarned: 0
+          }
+        });
       }
 
       if (user.wallet < bet) {
@@ -78,7 +87,7 @@ export class CrashCommand extends Command {
 
       const collector = response.createMessageComponentCollector({
         filter: i => i.user.id === userId && !hasEnded,
-        time: 20000 // Reduced from 30000 to prevent timeouts
+        time: 20000
       });
 
       games.set(userId, {
@@ -189,7 +198,7 @@ Current Multiplier: ${multiplier.toFixed(1)}x
   async endGame(interaction, userId, winnings, finalMultiplier) {
     try {
       const game = games.get(userId);
-      if (!game) return; // Prevent double processing
+      if (!game) return;
       
       games.delete(userId);
 

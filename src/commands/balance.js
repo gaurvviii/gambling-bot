@@ -1,5 +1,5 @@
 import { Command } from '@sapphire/framework';
-import { getUser } from '../lib/user.js';
+import { prisma } from '../lib/database.js';
 
 export class BalanceCommand extends Command {
   constructor(context, options) {
@@ -19,14 +19,24 @@ export class BalanceCommand extends Command {
   }
 
   async chatInputRun(interaction) {
-    // Defer the reply immediately to prevent interaction expiration
     await interaction.deferReply();
 
     try {
-      const user = await getUser(interaction.user.id);
+      // Get or create user automatically
+      let user = await prisma.user.findUnique({
+        where: { id: interaction.user.id }
+      });
 
+      // Auto-register if user doesn't exist
       if (!user) {
-        return interaction.editReply('You need to register first! Use /register');
+        user = await prisma.user.create({
+          data: {
+            id: interaction.user.id,
+            wallet: 0,
+            bank: 1000,
+            hoursEarned: 0
+          }
+        });
       }
 
       return interaction.editReply(`💰 Your Balance 💰\nWallet: $${user.wallet}\nBank: $${user.bank}\nTotal: $${user.wallet + user.bank}`);

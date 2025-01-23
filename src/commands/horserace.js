@@ -1,7 +1,5 @@
 import { Command } from '@sapphire/framework';
 import { prisma } from '../lib/database.js';
-import { getUser } from '../lib/user.js'; 
-
 
 const HORSES = [
   { name: '🐎 Thunderbolt', odds: 2.0 },
@@ -28,13 +26,20 @@ export class HorseRaceCommand extends Command {
     const bet = interaction.options.getInteger('bet');
     const horseNumber = interaction.options.getInteger('horse') - 1;
   
-    // Use the getUser function to retrieve the user
-    const user = await getUser(interaction.user.id);
-  
+    // Get or create user automatically
+    let user = await prisma.user.findUnique({
+      where: { id: interaction.user.id }
+    });
+
+    // Auto-register if user doesn't exist
     if (!user) {
-      return interaction.editReply({
-        content: 'You need to register first!',
-        ephemeral: true,
+      user = await prisma.user.create({
+        data: {
+          id: interaction.user.id,
+          wallet: 0,
+          bank: 1000,
+          hoursEarned: 0
+        }
       });
     }
   

@@ -36,59 +36,73 @@ export class TransferCommand extends Command {
   }
 
   async chatInputRun(interaction) {
-    const type = interaction.options.getString('type');
-    const amount = interaction.options.getInteger('amount');
+    // Defer the reply immediately to prevent interaction timeout
+    await interaction.deferReply();
     
-    const user = await prisma.user.findUnique({
-      where: { id: interaction.user.id }
-    });
-
-    if (!user) {
-      return interaction.reply({
-        content: 'You need to register first!',
-        ephemeral: true,
+    try {
+      const type = interaction.options.getString('type');
+      const amount = interaction.options.getInteger('amount');
+      
+      // Get or create user automatically
+      let user = await prisma.user.findUnique({
+        where: { id: interaction.user.id }
       });
-    }
 
-    if (type === 'toBank') {
-      if (user.wallet < amount) {
-        return interaction.reply(`❌ Insufficient funds in wallet! You have $${user.wallet}`);
+      // Auto-register if user doesn't exist
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            id: interaction.user.id,
+            wallet: 0,
+            bank: 1000,
+            hoursEarned: 0
+          }
+        });
       }
 
-      const updatedUser = await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          wallet: { decrement: amount },
-          bank: { increment: amount }
+      if (type === 'toBank') {
+        if (user.wallet < amount) {
+          return interaction.editReply(`❌ Insufficient funds in wallet! You have $${user.wallet}`);
         }
-      });
 
-      return interaction.reply(`
+        const updatedUser = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            wallet: { decrement: amount },
+            bank: { increment: amount }
+          }
+        });
+
+        return interaction.editReply(`
 ✅ Transfer Successful!
 Transferred $${amount} to bank
 New Wallet Balance: $${updatedUser.wallet}
 New Bank Balance: $${updatedUser.bank}
-      `);
+        `);
 
-    } else if (type === 'toWallet') {
-      if (user.bank < amount) {
-        return interaction.reply(`❌ Insufficient funds in bank! You have $${user.bank}`);
-      }
-
-      const updatedUser = await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          bank: { decrement: amount },
-          wallet: { increment: amount }
+      } else if (type === 'toWallet') {
+        if (user.bank < amount) {
+          return interaction.editReply(`❌ Insufficient funds in bank! You have $${user.bank}`);
         }
-      });
 
-      return interaction.reply(`
+        const updatedUser = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            bank: { decrement: amount },
+            wallet: { increment: amount }
+          }
+        });
+
+        return interaction.editReply(`
 ✅ Transfer Successful!
 Transferred $${amount} to wallet
 New Wallet Balance: $${updatedUser.wallet}
 New Bank Balance: $${updatedUser.bank}
-      `);
+        `);
+      }
+    } catch (error) {
+      console.error('Transfer command error:', error);
+      return interaction.editReply('❌ An error occurred while processing your transfer. Please try again.');
     }
   }
-} 
+}

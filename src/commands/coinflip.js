@@ -1,6 +1,5 @@
 import { Command } from '@sapphire/framework';
 import { prisma } from '../lib/database.js';
-import { getUser } from '../lib/user.js'; 
 
 export class CoinflipCommand extends Command {
   constructor(context, options) {
@@ -42,13 +41,20 @@ export class CoinflipCommand extends Command {
       const choice = interaction.options.getString('choice');
       const userId = interaction.user.id;
 
-      // Use getUser to fetch or create the user
-      const user = await getUser(userId);
+      // Get or create user automatically
+      let user = await prisma.user.findUnique({
+        where: { id: userId }
+      });
 
+      // Auto-register if user doesn't exist
       if (!user) {
-        return interaction.reply({
-          content: 'You need to register first!',
-          ephemeral: true
+        user = await prisma.user.create({
+          data: {
+            id: userId,
+            wallet: 0,
+            bank: 1000,
+            hoursEarned: 0
+          }
         });
       }
 

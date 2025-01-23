@@ -28,39 +28,55 @@ client.once('ready', async () => {
     console.log(`Current commands: ${commands?.size ?? 0}`);
 
     // Force register commands to your server
-    const guild = await client.guilds.fetch('1325400597117009971'); // done
+    const guild = await client.guilds.fetch('1138879497341522043'); // your server ID
     const guildCommands = await guild.commands.set([
       {
         name: 'slots',
-        description: 'Play slots'
+        description: 'Play slots! Bet an amount and try your luck'
       },
       {
         name: 'blackjack',
-        description: 'Play blackjack'
+        description: 'Play a game of blackjack'
       },
       {
         name: 'roulette',
-        description: 'Play roulette'
+        description: 'Play roulette with various betting options'
       },
       {
         name: 'baccarat',
-        description: 'Play baccarat'
+        description: 'Play baccarat - bet on Player, Banker, or Tie'
       },
       {
         name: 'crash',
-        description: 'Play crash game'
+        description: 'Play crash game - bet and cash out before it crashes!'
       },
       {
         name: 'minesweeper',
-        description: 'Play minesweeper'
+        description: 'Play minesweeper - reveal tiles and avoid mines!'
       },
       {
         name: 'horserace',
-        description: 'Bet on horse races'
+        description: 'Bet on horse races and watch them compete'
+      },
+      {
+        name: 'wheel',
+        description: 'Spin the Wheel of Fortune'
+      },
+      {
+        name: 'rps',
+        description: 'Play Rock-Paper-Scissors against bot or other players'
       },
       {
         name: 'bank',
         description: 'Manage your bank account'
+      },
+      {
+        name: 'balance',
+        description: 'Check your wallet and bank balance'
+      },
+      {
+        name: 'transfer',
+        description: 'Transfer money between bank and wallet'
       },
       {
         name: 'salary',
@@ -69,10 +85,18 @@ client.once('ready', async () => {
       {
         name: 'lottery',
         description: 'Participate in server lottery'
+      },
+      {
+        name: 'leaderboard',
+        description: 'View various gambling leaderboards'
+      },
+      {
+        name: 'fixbalance',
+        description: 'Admin command to fix user balance'
       }
     ]);
 
-    console.log(`Registered ${guildCommands.size} commands in ${guild.name}`);
+    console.log(`Successfully registered ${guildCommands.size} commands in ${guild.name}`);
   } catch (error) {
     console.error('Error registering commands:', error);
   }
@@ -80,10 +104,46 @@ client.once('ready', async () => {
   client.user.setActivity('🎰 Gambling Games', { type: ActivityType.Playing });
 });
 
-client.on('error', console.error);
+// Handle command errors
+client.on('chatInputCommandError', (error) => {
+  console.error('Command error:', error);
+});
 
+// Handle interaction errors
+client.on('interactionError', (error) => {
+  console.error('Interaction error:', error);
+});
+
+// Handle general errors
+client.on('error', (error) => {
+  console.error('Client error:', error);
+});
+
+// Handle unhandled promise rejections
 process.on('unhandledRejection', (error) => {
   console.error('Unhandled promise rejection:', error);
 });
 
-client.login(process.env.DISCORD_TOKEN); 
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught exception:', error);
+});
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  console.log('Shutting down...');
+  await client.destroy();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  console.log('Shutting down...');
+  await client.destroy();
+  process.exit(0);
+});
+
+// Login with error handling
+client.login(process.env.DISCORD_TOKEN).catch(error => {
+  console.error('Failed to login:', error);
+  process.exit(1);
+});

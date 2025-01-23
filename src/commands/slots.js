@@ -28,14 +28,20 @@ export class SlotsCommand extends Command {
   async chatInputRun(interaction) {
     const bet = interaction.options.getInteger('bet');
     
-    const user = await prisma.user.findUnique({
+    // Get or create user automatically
+    let user = await prisma.user.findUnique({
       where: { id: interaction.user.id }
     });
 
+    // Auto-register if user doesn't exist
     if (!user) {
-      return interaction.reply({
-        content: 'You need to register first!',
-        ephemeral: true,
+      user = await prisma.user.create({
+        data: {
+          id: interaction.user.id,
+          wallet: 0,
+          bank: 1000,
+          hoursEarned: 0
+        }
       });
     }
 

@@ -36,17 +36,25 @@ export class WheelCommand extends Command {
     await interaction.deferReply();
 
     const bet = interaction.options.getInteger('bet');
-    const user = await prisma.user.findUnique({
+    
+    // Get or create user automatically
+    let user = await prisma.user.findUnique({
       where: { id: interaction.user.id }
     });
-    
+
+    // Auto-register if user doesn't exist
     if (!user) {
-      return interaction.reply({
-        content: 'You need to register first!',
-        ephemeral: true,
+      user = await prisma.user.create({
+        data: {
+          id: interaction.user.id,
+          wallet: 0,
+          bank: 1000,
+          hoursEarned: 0
+        }
       });
     }
-    if (!user || user.wallet < bet) {
+
+    if (user.wallet < bet) {
       return interaction.editReply('Insufficient funds in wallet!');
     }
 
@@ -105,4 +113,4 @@ Multiplier: ${result.multiplier}x
 ${winnings > 0 ? `You won $${winnings}!` : 'You lost!'}
     `);
   }
-} 
+}

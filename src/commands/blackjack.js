@@ -1,7 +1,6 @@
 import { Command } from '@sapphire/framework';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from 'discord.js';
 import { BlackjackGame } from '../lib/games/blackjackGame.js';
-import { getUser } from '../lib/user.js';
 import { prisma } from '../lib/database.js';
 
 // Define the games map to track active games
@@ -33,7 +32,6 @@ export class BlackjackCommand extends Command {
 
   async chatInputRun(interaction) {
     try {
-      // Defer the reply immediately to prevent interaction timeout
       await interaction.deferReply();
 
       const userId = interaction.user.id;
@@ -42,7 +40,23 @@ export class BlackjackCommand extends Command {
       }
 
       const bet = interaction.options.getInteger('bet');
-      const user = await getUser(userId);
+
+      // Get or create user automatically
+      let user = await prisma.user.findUnique({
+        where: { id: userId }
+      });
+
+      // Auto-register if user doesn't exist
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            id: userId,
+            wallet: 0,
+            bank: 1000,
+            hoursEarned: 0
+          }
+        });
+      }
 
       if (user.wallet < bet) {
         return interaction.editReply('Insufficient funds in wallet!');
@@ -78,7 +92,7 @@ export class BlackjackCommand extends Command {
 
       const collector = response.createMessageComponentCollector({
         componentType: ComponentType.Button,
-        time: 20000 // Reduced from 30000 to 20000
+        time: 20000
       });
 
       collector.on('collect', async (i) => {

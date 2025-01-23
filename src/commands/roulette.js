@@ -47,22 +47,23 @@ export class RouletteCommand extends Command {
     );
   }
 
-  // Define the getUser function to check if the user is registered
-  async getUser(userId) {
-    return await prisma.user.findUnique({
-      where: { id: userId }
-    });
-  }
-
   async chatInputRun(interaction) {
     const userId = interaction.user.id;
     
-    // Check if the user is registered
-    const user = await this.getUser(userId);
+    // Get or create user automatically
+    let user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    // Auto-register if user doesn't exist
     if (!user) {
-      return interaction.reply({
-        content: 'You need to register first!',
-        ephemeral: true,
+      user = await prisma.user.create({
+        data: {
+          id: userId,
+          wallet: 0,
+          bank: 1000,
+          hoursEarned: 0
+        }
       });
     }
     

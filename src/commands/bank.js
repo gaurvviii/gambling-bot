@@ -47,22 +47,26 @@ export class BankCommand extends Command {
       const subcommand = interaction.options.getSubcommand();
       const userId = interaction.user.id;
 
-      // Fetch user from database
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
+      // Get or create user automatically
+      let user = await prisma.user.findUnique({
+        where: { id: userId }
       });
 
+      // Auto-register if user doesn't exist
       if (!user) {
-        return interaction.reply({
-          content: 'You need to register first!',
-          ephemeral: true,
+        user = await prisma.user.create({
+          data: {
+            id: userId,
+            wallet: 0,
+            bank: 1000,
+            hoursEarned: 0
+          }
         });
       }
 
       if (subcommand === 'withdraw') {
         const withdrawAmount = interaction.options.getInteger('amount');
 
-        // Check for sufficient bank balance
         if (withdrawAmount > user.bank) {
           return interaction.reply({
             content: 'Insufficient funds in bank!',
@@ -70,7 +74,6 @@ export class BankCommand extends Command {
           });
         }
 
-        // Update bank and wallet using a transaction
         await prisma.$transaction([
           prisma.user.update({
             where: { id: userId },
@@ -89,7 +92,6 @@ export class BankCommand extends Command {
       if (subcommand === 'deposit') {
         const depositAmount = interaction.options.getInteger('amount');
 
-        // Check for sufficient wallet balance
         if (depositAmount > user.wallet) {
           return interaction.reply({
             content: 'Insufficient funds in wallet!',
@@ -97,7 +99,6 @@ export class BankCommand extends Command {
           });
         }
 
-        // Update wallet and bank using a transaction
         await prisma.$transaction([
           prisma.user.update({
             where: { id: userId },

@@ -17,8 +17,10 @@ model User {
   totalWon             Int                @default(0)
   totalLost            Int                @default(0)
   lastSalaryClaim      DateTime?          @db.Timestamp // Track the date of the last salary claim
+  lastEarningStart     DateTime?          @db.Timestamp // Track when the current earning period started
+  hoursEarned          Int                @default(0) // Track hours earned in current period
   lastClaimDate        DateTime?          @db.Timestamp
-  claimsMade           Int                @default(0) // Track the total number of claims made
+  claimsMade           Int                @default(0)   // Track the total number of claims made
   role                 String             @default("Member")
   tickets              LotteryTicket[] 
 }

@@ -44,8 +44,7 @@ export class MinesweeperCommand extends Command {
     const mines = new Set();
 
     while (mines.size < mineCount) {
-      const position = Math.floor(Math.random() * grid.length);
-      if (!mines.has(position)) {
+      const position = Math.floor(Math.random() * grid.length); if (!mines.has(position)) {
         mines.add(position);
         grid[position] = true;
       }
@@ -123,12 +122,21 @@ export class MinesweeperCommand extends Command {
         return interaction.reply(`Mine count must be between ${MIN_MINES} and ${MAX_MINES}!`);
       }
 
-      const user = await prisma.user.findUnique({
+      // Get or create user automatically
+      let user = await prisma.user.findUnique({
         where: { id: userId }
       });
 
+      // Auto-register if user doesn't exist
       if (!user) {
-        return interaction.reply('You need to register first!');
+        user = await prisma.user.create({
+          data: {
+            id: userId,
+            wallet: 0,
+            bank: 1000,
+            hoursEarned: 0
+          }
+        });
       }
 
       if (bet > user.wallet) {

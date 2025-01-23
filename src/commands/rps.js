@@ -39,23 +39,24 @@ export class RPSCommand extends Command {
     );
   }
 
-  // Define the getUser function to check if the user is registered
-  async getUser(userId) {
-    return await prisma.user.findUnique({
-      where: { id: userId }
-    });
-  }
-
   async chatInputRun(interaction) {
     const bet = interaction.options.getInteger('bet');
     const opponent = interaction.options.getUser('opponent');
     
-    // Check if the user is registered
-    const user = await this.getUser(interaction.user.id);
+    // Get or create user automatically
+    let user = await prisma.user.findUnique({
+      where: { id: interaction.user.id }
+    });
+
+    // Auto-register if user doesn't exist
     if (!user) {
-      return interaction.reply({
-        content: 'You need to register first!',
-        ephemeral: true,
+      user = await prisma.user.create({
+        data: {
+          id: interaction.user.id,
+          wallet: 0,
+          bank: 1000,
+          hoursEarned: 0
+        }
       });
     }
 
@@ -136,12 +137,33 @@ ${result === 'win' ? `You won $${winnings}!` : result === 'lose' ? 'You lost!' :
       return interaction.reply('You cannot challenge yourself!');
     }
 
-    // Check if both users are registered
-    const user = await this.getUser(interaction.user.id);
-    const opponentUser = await this.getUser(opponent.id);
+    // Get or create both users
+    let [user, opponentUser] = await Promise.all([
+      prisma.user.findUnique({ where: { id: interaction.user.id } }),
+      prisma.user.findUnique({ where: { id: opponent.id } })
+    ]);
 
-    if (!user || !opponentUser) {
-      return interaction.reply('Both players need to be registered first!');
+    // Auto-register if either user doesn't exist
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          id: interaction.user.id,
+          wallet: 0,
+          bank: 1000,
+          hoursEarned: 0
+        }
+      });
+    }
+
+    if (!opponentUser) {
+      opponentUser = await prisma.user.create({
+        data: {
+          id: opponent.id,
+          wallet: 0,
+          bank: 1000,
+          hoursEarned: 0
+        }
+      });
     }
 
     if (user.wallet < bet || opponentUser.wallet < bet) {
