@@ -28,7 +28,7 @@ client.once('ready', async () => {
     console.log(`Current commands: ${commands?.size ?? 0}`);
 
     // Force register commands to your server
-    const guild = await client.guilds.fetch('1328764959907385357'); // change
+    const guild = await client.guilds.fetch('1325400597117009971'); // done 
     const guildCommands = await guild.commands.set([
       {
         name: 'slots',
