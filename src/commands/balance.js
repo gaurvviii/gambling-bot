@@ -1,5 +1,6 @@
 import { Command } from '@sapphire/framework';
 import { prisma } from '../lib/database.js';
+import { GAMBLING_CHANNEL_ID } from '../config/constants.js';
 
 export class BalanceCommand extends Command {
   constructor(context, options) {
@@ -19,9 +20,16 @@ export class BalanceCommand extends Command {
   }
 
   async chatInputRun(interaction) {
-    await interaction.deferReply();
+    // Check if command is used in gambling channel
+    if (interaction.channelId !== GAMBLING_CHANNEL_ID) {
+      return interaction.reply({
+        content: '⚠️ This command can only be used in the gambling channel!',
+        ephemeral: true
+      });
+    }
 
     try {
+      await interaction.deferReply({ ephemeral: true });
       // Get or create user automatically
       let user = await prisma.user.findUnique({
         where: { id: interaction.user.id }

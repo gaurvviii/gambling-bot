@@ -4,6 +4,7 @@ import cron from 'node-cron';
 import ROLES from '../config/salaries.js';
 import ROLE_IDS from '../config/roleIds.js';
 import { prisma } from '../lib/database.js';
+import { GAMBLING_CHANNEL_ID } from '../config/constants.js';
 
 export class SalaryCommand extends Command {
   constructor(context, options) {
@@ -27,7 +28,16 @@ export class SalaryCommand extends Command {
 
   async chatInputRun(interaction) {
     try {
-      await interaction.deferReply();
+      // Restrict command to the gambling channel
+      if (interaction.channelId !== GAMBLING_CHANNEL_ID) {
+        return interaction.reply({
+          content: '⚠️ This command can only be used in the gambling channel!',
+          ephemeral: true,
+        });
+      }
+
+      // Defer the reply
+      await interaction.deferReply({ ephemeral: true });
 
       // Check if command is used in a guild
       if (!interaction.inGuild()) {
@@ -35,12 +45,6 @@ export class SalaryCommand extends Command {
       }
 
       const now = new Date();
-      const dayOfWeek = now.getDay();
-
-      // Check if it's weekend
-      if (dayOfWeek === 0 || dayOfWeek === 6) {
-        return interaction.editReply('⚠️ Salary earning is paused during weekends (Saturday and Sunday)');
-      }
 
       // Get or create user automatically
       let user = await prisma.user.findUnique({
@@ -112,7 +116,7 @@ export class SalaryCommand extends Command {
           { name: 'Hours Credited Today', value: `${hoursEarned}/8`, inline: true },
           { name: 'Total Earnings Today', value: `$${totalEarnings}`, inline: true }
         )
-        .setFooter({ text: 'Salary is automatically credited hourly during weekdays, up to 8 hours per day' });
+        .setFooter({ text: 'Salary is automatically credited hourly, up to 8 hours per day' });
 
       if (hoursEarned >= 8) {
         embed.setDescription('✅ You have earned your full salary for today (8 hours = $' + (8 * hourlyRate) + ').\nCome back tomorrow for more earnings!');
@@ -145,16 +149,10 @@ export class SalaryCommand extends Command {
       }
     });
 
-    // Credit salary every hour on weekdays
+    // Credit salary every hour
     cron.schedule('0 * * * *', async () => {
       try {
         const now = new Date();
-        const dayOfWeek = now.getDay();
-
-        // Skip on weekends
-        if (dayOfWeek === 0 || dayOfWeek === 6) {
-          return;
-        }
 
         // Get all users who haven't maxed out their hours today
         const users = await prisma.user.findMany({
@@ -173,7 +171,7 @@ export class SalaryCommand extends Command {
               // Fetch the user's guild member to check roles
               const guild = this.container.client.guilds.cache.first();
               const member = await guild?.members.fetch(user.id).catch(() => null);
-              
+
               if (!member) continue;
 
               // Determine role and salary
@@ -187,19 +185,23 @@ export class SalaryCommand extends Command {
 
               const role = ROLES[roleKey];
               const hourlyRate = role.hourlyRate;
-              
+
               // Calculate new hours and earnings, capped at 8 hours
               const newHours = Math.min(8, user.hoursEarned + 1);
-              
+
               // Update user's wallet and hours
-              await prisma.user.update({
-                where: { id: user.id },
-                data: {
-                  wallet: { increment: hourlyRate },
-                  hoursEarned: newHours,
-                  lastEarningStart: now
-                }
-              });
+              try {
+                await prisma.user.update({
+                  where: { id: user.id },
+                  data: {
+                    wallet: { increment: hourlyRate },
+                    hoursEarned: newHours,
+                    lastEarningStart: now,
+                  },
+                });
+              } catch (error) {
+                console.error(`Error updating wallet for user ${user.id}:`, error);
+              }
             }
           } catch (error) {
             console.error(`Error processing salary for user ${user.id}:`, error);

@@ -8,22 +8,23 @@ generator client {
   provider = "prisma-client-js"
 }
 
+
 model User {
-  id                   String             @id @default(cuid())
-  balance              Int                @default(1000)
-  bank                 Int                @default(0)
-  wallet               Int                @default(0)
-  wantsNotifications   Boolean            @default(false)
-  totalWon             Int                @default(0)
-  totalLost            Int                @default(0)
-  lastSalaryClaim      DateTime?          @db.Timestamp // Track the date of the last salary claim
-  lastEarningStart     DateTime?          @db.Timestamp // Track when the current earning period started
-  hoursEarned          Int                @default(0) // Track hours earned in current period
-  lastClaimDate        DateTime?          @db.Timestamp
-  claimsMade           Int                @default(0)   // Track the total number of claims made
-  role                 String             @default("Member")
-  tickets              LotteryTicket[] 
+  id                  String             @id @default(cuid())
+  balance             Int                @default(1000)
+  bank                Int                @default(0)
+  wallet              Int                @default(0)
+  wantsNotifications  Boolean            @default(false)
+  totalWon            Int                @default(0)
+  totalLost           Int                @default(0)
+  lastSalaryClaim     DateTime?          @db.Timestamp // Track the date of the last salary claim
+  lastEarningStart    DateTime?          @db.Timestamp // Track when the current earning period started
+  hoursEarned         Int                @default(0) // Track hours earned in current period
+  claimsMade          Int                @default(0)   // Track the total number of claims made
+  role                String             @default("Member")
+  tickets             LotteryTicket[]    // This will track all associated tickets without duplicates
 }
+
 
 model Lottery {
   id          String    @id @default(cuid())

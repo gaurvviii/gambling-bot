@@ -1,5 +1,6 @@
 import { Command } from '@sapphire/framework';
 import { prisma } from '../lib/database.js';
+import { GAMBLING_CHANNEL_ID } from '../config/constants.js';
 
 export class SlotsCommand extends Command {
   constructor(context, options) {
@@ -26,9 +27,18 @@ export class SlotsCommand extends Command {
   }
 
   async chatInputRun(interaction) {
-    await interaction.deferReply();
-
     try {
+      // Restrict command to the gambling channel
+      if (interaction.channelId !== GAMBLING_CHANNEL_ID) {
+        return interaction.reply({
+          content: '⚠️ This command can only be used in the gambling channel!',
+          ephemeral: true,
+        });
+      }
+
+      // Defer the reply
+      await interaction.deferReply({ephemeral: true});
+
       const bet = interaction.options.getInteger('bet');
       
       // Get or create user automatically

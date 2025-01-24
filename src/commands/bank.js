@@ -1,5 +1,6 @@
 import { Command } from '@sapphire/framework';
 import { prisma } from '../lib/database.js';
+import { GAMBLING_CHANNEL_ID } from '../config/constants.js';
 
 export class BankCommand extends Command {
   constructor(context, options) {
@@ -43,7 +44,16 @@ export class BankCommand extends Command {
   }
 
   async chatInputRun(interaction) {
+    // Check if command is used in gambling channel
+    if (interaction.channelId !== GAMBLING_CHANNEL_ID) {
+      return interaction.reply({
+        content: '⚠️ This command can only be used in the gambling channel!',
+        ephemeral: true
+      });
+    }
+
     try {
+      await interaction.deferReply({ ephemeral: true });
       const subcommand = interaction.options.getSubcommand();
       const userId = interaction.user.id;
 
@@ -120,5 +130,5 @@ export class BankCommand extends Command {
         ephemeral: true,
       });
     }
-  }
-}
+        }
+        }

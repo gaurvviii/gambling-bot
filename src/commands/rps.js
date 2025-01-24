@@ -1,6 +1,7 @@
 import { Command } from '@sapphire/framework';
 import { prisma } from '../lib/database.js';
 import { ButtonBuilder, ActionRowBuilder, ButtonStyle, ComponentType } from 'discord.js';
+import { GAMBLING_CHANNEL_ID } from '../config/constants.js';
 
 const CHOICES = ['rock', 'paper', 'scissors'];
 const EMOJIS = {
@@ -40,6 +41,11 @@ export class RPSCommand extends Command {
   }
 
   async chatInputRun(interaction) {
+        // Check if the interaction is in the correct channel
+        if (interaction.channel.id !== GAMBLING_CHANNEL_ID) {
+          return interaction.reply('You can only play Rock-Paper-Scissors in the gambling channel!');
+        }
+
     const bet = interaction.options.getInteger('bet');
     const opponent = interaction.options.getUser('opponent');
     

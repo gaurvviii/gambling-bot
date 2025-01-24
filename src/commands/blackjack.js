@@ -2,6 +2,7 @@ import { Command } from '@sapphire/framework';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from 'discord.js';
 import { BlackjackGame } from '../lib/games/blackjackGame.js';
 import { prisma } from '../lib/database.js';
+import { GAMBLING_CHANNEL_ID } from '../config/constants.js';
 
 // Define the games map to track active games
 const games = new Map();
@@ -31,8 +32,16 @@ export class BlackjackCommand extends Command {
   }
 
   async chatInputRun(interaction) {
+    // Check if command is used in gambling channel
+    if (interaction.channelId !== GAMBLING_CHANNEL_ID) {
+      return interaction.reply({
+        content: '⚠️ This command can only be used in the gambling channel!',
+        ephemeral: true
+      });
+    }
+
     try {
-      await interaction.deferReply();
+      await interaction.deferReply({ ephemeral: true });
 
       const userId = interaction.user.id;
       if (games.has(userId)) {

@@ -17,8 +17,16 @@ export async function getUser(userId) {
 }
 
 export async function updateBalance(userId, amount) {
-  return prisma.user.update({
-    where: { id: userId },
-    data: { balance: { increment: amount } }
-  });
-} 
+  try {
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { balance: { increment: amount } },
+    });
+
+    console.log(`Balance updated successfully for user ${userId}:`, updatedUser);
+    return updatedUser;
+  } catch (error) {
+    console.error(`Error updating balance for user ${userId}:`, error);
+    throw error; 
+}
+}

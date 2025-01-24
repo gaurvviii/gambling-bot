@@ -1,6 +1,8 @@
 import { Command } from '@sapphire/framework';
 import { prisma } from '../lib/database.js';
 import { EmbedBuilder } from 'discord.js';
+import { GAMBLING_CHANNEL_ID } from '../config/constants.js';
+
 
 export class LeaderboardCommand extends Command {
   constructor(context, options) {
@@ -31,6 +33,10 @@ export class LeaderboardCommand extends Command {
   }
 
   async chatInputRun(interaction) {
+    // Check if the interaction is in the correct channel
+    if (interaction.channel.id !== GAMBLING_CHANNEL_ID) {
+      return interaction.reply('You can only view leaderboard in the gambling channel!');
+    }
     await interaction.deferReply();
 
     // Get or create user automatically

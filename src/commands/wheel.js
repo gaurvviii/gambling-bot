@@ -1,5 +1,6 @@
 import { Command } from '@sapphire/framework';
 import { prisma } from '../lib/database.js';
+import { GAMBLING_CHANNEL_ID } from '../config/constants.js';
 
 const WHEEL_SEGMENTS = [
   { multiplier: 2.0, chance: 30, emoji: '💰' },
@@ -33,7 +34,17 @@ export class WheelCommand extends Command {
   }
 
   async chatInputRun(interaction) {
-    await interaction.deferReply();
+    try {
+      // Restrict command to the banking channel
+      if (interaction.channelId !== GAMBLING_CHANNEL_ID) {
+        return interaction.reply({
+          content: '⚠️ This command can only be used in the banking channel!',
+          ephemeral: true,
+        });
+      }
+
+      // Defer the reply immediately to prevent interaction timeout
+      await interaction.deferReply({ephemeral: true});
 
     const bet = interaction.options.getInteger('bet');
     
@@ -112,5 +123,9 @@ Landed on: ${result.emoji}
 Multiplier: ${result.multiplier}x
 ${winnings > 0 ? `You won $${winnings}!` : 'You lost!'}
     `);
+  }catch (error) {
+    console.error('Transfer command error:', error);
+    return interaction.editReply('❌ An error occurred while processing your transfer. Please try again.');
   }
+}
 }

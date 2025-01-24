@@ -2,6 +2,7 @@ import { Command } from '@sapphire/framework';
 import { EmbedBuilder } from 'discord.js';
 import { prisma } from '../lib/database.js';
 import ROLE_IDS from '../config/roleIds.js';
+import { GAMBLING_CHANNEL_ID} from '../config/constants.js';
 
 export class LotteryCommand extends Command {
     constructor(context, options) {
@@ -82,7 +83,12 @@ export class LotteryCommand extends Command {
     }
 
     async chatInputRun(interaction) {
+        // Check if the interaction is in the correct channel
+    if (interaction.channel.id !== GAMBLING_CHANNEL_ID) {
+        return interaction.reply('You can only access lottery in the gambling channel!');
+      }
         try {
+                
             await interaction.deferReply({ ephemeral: false });
 
             const subcommand = interaction.options.getSubcommand(true);

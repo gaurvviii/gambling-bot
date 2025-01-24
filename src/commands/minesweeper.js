@@ -1,6 +1,7 @@
 import { Command } from '@sapphire/framework';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { prisma } from '../lib/database.js';
+import { GAMBLING_CHANNEL_ID } from '../config/constants.js';
 
 const games = new Map();
 const GRID_SIZE = 4;
@@ -12,7 +13,7 @@ export class MinesweeperCommand extends Command {
     super(context, {
       ...options,
       name: 'minesweeper',
-      description: 'Play minesweeper - reveal tiles and avoid mines!'
+      description: 'Play minesweeper - reveal tiles and avoid mines!',
     });
   }
 
@@ -22,11 +23,7 @@ export class MinesweeperCommand extends Command {
         .setName(this.name)
         .setDescription(this.description)
         .addIntegerOption((option) =>
-          option
-            .setName('bet')
-            .setDescription('Amount to bet')
-            .setRequired(true)
-            .setMinValue(1)
+          option.setName('bet').setDescription('Amount to bet').setRequired(true).setMinValue(1)
         )
         .addIntegerOption((option) =>
           option
@@ -44,7 +41,8 @@ export class MinesweeperCommand extends Command {
     const mines = new Set();
 
     while (mines.size < mineCount) {
-      const position = Math.floor(Math.random() * grid.length); if (!mines.has(position)) {
+      const position = Math.floor(Math.random() * grid.length);
+      if (!mines.has(position)) {
         mines.add(position);
         grid[position] = true;
       }
@@ -55,13 +53,12 @@ export class MinesweeperCommand extends Command {
       revealed: new Set(),
       multiplier: 1.0,
       active: true,
-      mineCount
+      mineCount,
     };
   }
 
   createButtons(gameState) {
     const rows = [];
-    // Create 4 rows with 5 buttons each
     for (let i = 0; i < 4; i++) {
       const row = new ActionRowBuilder();
       for (let j = 0; j < GRID_SIZE; j++) {
@@ -75,10 +72,8 @@ export class MinesweeperCommand extends Command {
       }
       rows.push(row);
     }
-    
-    // Last row combines the remaining game buttons and cashout button
+
     const lastRow = new ActionRowBuilder();
-    // Add the remaining game buttons (last row)
     for (let j = 0; j < GRID_SIZE; j++) {
       const position = 4 * GRID_SIZE + j;
       const button = new ButtonBuilder()
@@ -89,81 +84,88 @@ export class MinesweeperCommand extends Command {
       lastRow.addComponents(button);
     }
 
-    // Add the cashout button to the last row
     lastRow.addComponents(
       new ButtonBuilder()
         .setCustomId('cashout')
         .setLabel('Cash Out')
         .setStyle(ButtonStyle.Danger)
     );
-    
+
     rows.push(lastRow);
     return rows;
   }
 
   calculateMultiplierIncrement(mineCount) {
-    // Higher mine count = higher risk = higher reward
-    return 0.1 + (mineCount * 0.05);
+    return 0.1 + mineCount * 0.05;
   }
 
   async chatInputRun(interaction) {
     try {
+      // Restrict command to the gambling channel
+      if (interaction.channelId !== GAMBLING_CHANNEL_ID) {
+        return interaction.reply({
+          content: '⚠️ This command can only be used in the gambling channel!',
+          ephemeral: true,
+        });
+      }
+
+      // Defer the reply
+      await interaction.deferReply({ephemeral: true});
+
       const userId = interaction.user.id;
       const existingGame = games.get(userId);
-      
+
       if (existingGame && existingGame.active) {
-        return interaction.reply('You already have a game in progress!');
+        return interaction.followUp('You already have a game in progress!');
       }
 
       const bet = interaction.options.getInteger('bet');
-      const mineCount = interaction.options.getInteger('mines') || 3; // Default to 3 mines if not specified
+      const mineCount = interaction.options.getInteger('mines') || 3;
 
       if (mineCount < MIN_MINES || mineCount > MAX_MINES) {
-        return interaction.reply(`Mine count must be between ${MIN_MINES} and ${MAX_MINES}!`);
+        return interaction.followUp(`Mine count must be between ${MIN_MINES} and ${MAX_MINES}!`);
       }
 
-      // Get or create user automatically
       let user = await prisma.user.findUnique({
-        where: { id: userId }
+        where: { id: userId },
       });
 
-      // Auto-register if user doesn't exist
       if (!user) {
         user = await prisma.user.create({
           data: {
             id: userId,
             wallet: 0,
             bank: 1000,
-            hoursEarned: 0
-          }
+            hoursEarned: 0,
+          },
         });
       }
 
       if (bet > user.wallet) {
-        return interaction.reply('Insufficient funds in wallet!');
+        return interaction.followUp('Insufficient funds in wallet!');
       }
 
       await prisma.user.update({
         where: { id: userId },
         data: {
-          wallet: { decrement: bet }
-        }
+          wallet: { decrement: bet },
+        },
       });
 
       const gameState = this.createGame(mineCount);
       games.set(userId, {
         ...gameState,
-        bet
+        bet,
       });
 
-      const response = await interaction.reply({
+      const response = await interaction.editReply({
         content: this.getGameState(bet, gameState.multiplier, mineCount),
-        components: this.createButtons(gameState)
+        components: this.createButtons(gameState),
       });
 
       const collector = response.createMessageComponentCollector({
-        filter: i => i.user.id === userId,
-        time: 60000
+        filter: (i) => i.user.id === userId,
+        time: 60000,
       });
 
       collector.on('collect', async (i) => {
@@ -181,7 +183,6 @@ export class MinesweeperCommand extends Command {
         game.revealed.add(position);
 
         if (game.grid[position]) {
-          // Hit a mine
           await this.endGame(i, userId, 0);
           collector.stop();
           return;
@@ -190,7 +191,7 @@ export class MinesweeperCommand extends Command {
         game.multiplier += this.calculateMultiplierIncrement(game.mineCount);
         await i.update({
           content: this.getGameState(bet, game.multiplier, game.mineCount),
-          components: this.createButtons(game)
+          components: this.createButtons(game),
         });
       });
 
@@ -200,7 +201,7 @@ export class MinesweeperCommand extends Command {
           game.active = false;
           await interaction.editReply({
             content: 'Game expired!',
-            components: []
+            components: [],
           });
         }
       });
@@ -223,7 +224,7 @@ Potential Win: $${Math.floor(bet * multiplier)}
   async endGame(interaction, userId, winnings) {
     const game = games.get(userId);
     if (!game || !game.active) return;
-    
+
     game.active = false;
 
     try {
@@ -232,36 +233,36 @@ Potential Win: $${Math.floor(bet * multiplier)}
           where: { id: userId },
           data: {
             wallet: { increment: winnings },
-            totalWon: { increment: winnings - game.bet }
-          }
+            totalWon: { increment: winnings - game.bet },
+          },
         });
 
         await interaction.update({
           content: `
 💰 You won $${winnings}!
 Final multiplier: ${game.multiplier.toFixed(1)}x`,
-          components: []
+          components: [],
         });
       } else {
         await prisma.user.update({
           where: { id: userId },
           data: {
-            totalLost: { increment: game.bet }
-          }
+            totalLost: { increment: game.bet },
+          },
         });
 
         await interaction.update({
           content: `
 💥 BOOM! You hit a mine!
 You lost $${game.bet}!`,
-          components: []
+          components: [],
         });
       }
     } catch (error) {
       console.error('Error ending game:', error);
       await interaction.update({
         content: 'An error occurred while ending the game.',
-        components: []
+        components: [],
       });
     } finally {
       games.delete(userId);
