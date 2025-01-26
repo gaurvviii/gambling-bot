@@ -27,7 +27,7 @@ export class SalaryCronJob {
           lastEarningStart: new Date()
         }
       });
-      console.log('Successfully reset all salaries');
+      console.log('Successfully reset all salaries at midnight');
     } catch (error) {
       console.error('Error resetting salaries:', error);
     }
@@ -37,38 +37,40 @@ export class SalaryCronJob {
     try {
       const now = new Date();
       const guild = this.client.guilds.cache.first();
-      
+
       if (!guild) {
         console.error('No guild found');
         return;
       }
 
-      // Fetch eligible users who haven't maxed out their hours
-      const users = await prisma.user.findMany({
-        where: {
-          hoursEarned: { lt: 8 },
-          lastEarningStart: { not: null }
-        }
-      });
-
-      // Fetch all guild members once to avoid multiple API calls
+      // Fetch all guild members
       const members = await guild.members.fetch();
 
-      for (const user of users) {
+      for (const member of members.values()) {
         try {
-          const member = members.get(user.id);
-          
-          // Skip if user is not in the guild anymore
-          if (!member) {
-            console.log(`User ${user.id} not found in guild`);
-            continue;
+          // Check if the user exists in the database
+          let user = await prisma.user.findUnique({ where: { id: member.id } });
+
+          if (!user) {
+            // Create a new user if they are not found
+            user = await prisma.user.create({
+              data: {
+                id: member.id,
+                bank: 1000,
+                wallet:0,
+                hoursEarned: 0,
+                lastEarningStart: now
+              }
+            });
+            console.log(`Created a new user entry for ${member.id}`);
           }
 
+          // Determine the time passed since the last earning start
           const lastEarningStart = new Date(user.lastEarningStart);
           const hoursPassed = Math.floor((now - lastEarningStart) / 3600000);
 
-          if (hoursPassed >= 1) {
-            // Determine highest applicable role and corresponding salary
+          if (hoursPassed >= 1 && user.hoursEarned < 8) {
+            // Determine the user's highest role
             const roleKey = this.determineHighestRole(member);
             const role = ROLES[roleKey];
             const hourlyRate = role.hourlyRate;
@@ -76,11 +78,11 @@ export class SalaryCronJob {
             // Calculate new hours (capped at 8)
             const newHours = Math.min(8, user.hoursEarned + 1);
 
-            // Update user's wallet and hours
+            // Update the user's wallet and hours
             await prisma.user.update({
               where: { id: user.id },
               data: {
-                wallet: { increment: hourlyRate },
+                bank: { increment: hourlyRate },
                 hoursEarned: newHours,
                 lastEarningStart: now
               }
@@ -89,11 +91,11 @@ export class SalaryCronJob {
             console.log(`Credited ${hourlyRate} to user ${user.id} (${roleKey})`);
           }
         } catch (error) {
-          console.error(`Error processing salary for user ${user.id}:`, error);
+          console.error(`Error processing salary for member ${member.id}:`, error);
         }
       }
     } catch (error) {
-      console.error('Error in salary cron job:', error);
+      console.error('Error in crediting hourly salaries:', error);
     }
   }
 

@@ -2,6 +2,7 @@ import { LogLevel, SapphireClient } from '@sapphire/framework';
 import '@sapphire/plugin-logger/register';
 import { GatewayIntentBits, ActivityType } from 'discord.js';
 import { config } from 'dotenv';
+import { SalaryCronJob } from '../src/jobs/salarycronjobs';
 
 config();
 
@@ -21,14 +22,14 @@ const client = new SapphireClient({
 client.once('ready', async () => {
   const { username, id } = client.user;
   console.log(`Logged in as ${username} (${id})`);
-  
+
   try {
     // Get all commands
     const commands = await client.application?.commands.fetch();
     console.log(`Current commands: ${commands?.size ?? 0}`);
 
     // Force register commands to your server
-    const guild = await client.guilds.fetch('1325400597117009971'); // done 
+    const guild = await client.guilds.fetch('1325400597117009971'); // Replace with your guild ID
     const guildCommands = await guild.commands.set([
       {
         name: 'slots',
@@ -90,6 +91,9 @@ client.once('ready', async () => {
   }
 
   client.user.setActivity('🎰 Gambling Games', { type: ActivityType.Playing });
+
+  // Start the salary cron job
+  new SalaryCronJob(client);
 });
 
 // Handle command errors
