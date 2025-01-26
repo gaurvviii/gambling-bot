@@ -68,27 +68,34 @@ export class SalaryCommand extends Command {
 
       let roleKey = 'MEMBER';
       let highestRole = 'Basic Member';
-
-      // Ensure STAFF is always the highest
-      if (member.roles.cache.has(ROLE_IDS.STAFF)) {
-        roleKey = 'STAFF';
-        highestRole = 'Staff Member';
-      } else if (member.roles.cache.has(ROLE_IDS.ZYZZ_GOD)) {
-        roleKey = 'ZYZZ_GOD';
-        highestRole = 'Zyzz God';
-      } else if (member.roles.cache.has(ROLE_IDS.DONATOR_PLUS_PLUS)) {
-        roleKey = 'DONATOR_PLUS_PLUS';
-        highestRole = 'Donator++';
-      } else if (member.roles.cache.has(ROLE_IDS.DONATOR_PLUS)) {
-        roleKey = 'DONATOR_PLUS';
-        highestRole = 'Donator+';
-      } else if (member.roles.cache.has(ROLE_IDS.DONATOR)) {
-        roleKey = 'DONATOR';
-        highestRole = 'Donator';
-      } else if (member.roles.cache.has(ROLE_IDS.SERVER_BOOSTER)) {
-        roleKey = 'SERVER_BOOSTER';
-        highestRole = 'Server Booster';
+      
+      // Define the role hierarchy
+      const roleHierarchy = [
+        { id: ROLE_IDS.STAFF, key: 'STAFF', name: 'Staff Member' },
+        { id: ROLE_IDS.ZYZZ_GOD, key: 'ZYZZ_GOD', name: 'Zyzz God' },
+        { id: ROLE_IDS.DONATOR_PLUS_PLUS, key: 'DONATOR_PLUS_PLUS', name: 'Donator++' },
+        { id: ROLE_IDS.DONATOR_PLUS, key: 'DONATOR_PLUS', name: 'Donator+' },
+        { id: ROLE_IDS.DONATOR, key: 'DONATOR', name: 'Donator' },
+        { id: ROLE_IDS.SERVER_BOOSTER, key: 'SERVER_BOOSTER', name: 'Server Booster' }
+      ];
+      
+      // Check each role in the hierarchy
+      for (const role of roleHierarchy) {
+        if (member.roles.cache.has(role.id)) {
+          roleKey = role.key;
+          highestRole = role.name;
+          break; // Stop once a role is found
+        }
       }
+      
+      // If no roles were found, fallback to 'MEMBER' (lowest role)
+      if (highestRole === 'Basic Member' && !member.roles.cache.size) {
+        roleKey = 'MEMBER';
+        highestRole = 'Basic Member';
+      }
+      
+      console.log(`Highest role for ${member.user.username}: ${highestRole} (${roleKey})`);
+      
 
       const role = ROLES[roleKey];
       const hourlyRate = role.hourlyRate;

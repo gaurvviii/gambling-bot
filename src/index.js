@@ -2,7 +2,8 @@ import { LogLevel, SapphireClient } from '@sapphire/framework';
 import '@sapphire/plugin-logger/register';
 import { GatewayIntentBits, ActivityType } from 'discord.js';
 import { config } from 'dotenv';
-import { SalaryCronJob } from '../src/jobs/salarycronjobs';
+import { SalaryCronJob } from '/Users/dhyan/gambling-bot/src/jobs/salarycronjobs.js';
+
 
 config();
 
@@ -29,7 +30,7 @@ client.once('ready', async () => {
     console.log(`Current commands: ${commands?.size ?? 0}`);
 
     // Force register commands to your server
-    const guild = await client.guilds.fetch('1325400597117009971'); // Replace with your guild ID
+    const guild = await client.guilds.fetch('1328764959907385357'); // Replace with your guild ID
     const guildCommands = await guild.commands.set([
       {
         name: 'slots',

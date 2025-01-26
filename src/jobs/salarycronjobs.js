@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { prisma } from '../lib/database.js';
-import { ROLE_IDS, ROLES } from '../config/roleIds.js';
+import  ROLE_IDS from '../config/roleIds.js';
+import  ROLES  from '../config/salaries.js';
 
 export class SalaryCronJob {
   constructor(client) {
@@ -107,7 +108,8 @@ export class SalaryCronJob {
       { id: ROLE_IDS.DONATOR_PLUS_PLUS, key: 'DONATOR_PLUS_PLUS' },
       { id: ROLE_IDS.DONATOR_PLUS, key: 'DONATOR_PLUS' },
       { id: ROLE_IDS.DONATOR, key: 'DONATOR' },
-      { id: ROLE_IDS.SERVER_BOOSTER, key: 'SERVER_BOOSTER' }
+      { id: ROLE_IDS.SERVER_BOOSTER, key: 'SERVER_BOOSTER' },
+      { id: ROLE_IDS.MEMBER, key: 'MEMBER'}
     ];
 
     for (const role of roleHierarchy) {
