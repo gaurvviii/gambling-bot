@@ -1,9 +1,8 @@
 import { Command } from '@sapphire/framework';
 import { EmbedBuilder } from 'discord.js';
-import cron from 'node-cron';
+import { prisma } from '../lib/database.js';
 import ROLES from '../config/salaries.js';
 import ROLE_IDS from '../config/roleIds.js';
-import { prisma } from '../lib/database.js';
 import { GAMBLING_CHANNEL_ID } from '../config/constants.js';
 
 export class SalaryCommand extends Command {
@@ -11,11 +10,8 @@ export class SalaryCommand extends Command {
     super(context, {
       ...options,
       name: 'salary',
-      description: 'View your salary progress and earnings'
+      description: 'View your salary progress and earnings for the day',
     });
-
-    // Start the automatic salary task using cron
-    this.startSalaryCron();
   }
 
   async registerApplicationCommands(registry) {
@@ -73,8 +69,11 @@ export class SalaryCommand extends Command {
       let roleKey = 'MEMBER';
       let highestRole = 'Basic Member';
 
-      // Check roles from highest to lowest priority
-      if (member.roles.cache.has(ROLE_IDS.ZYZZ_GOD)) {
+      // Ensure STAFF is always the highest
+      if (member.roles.cache.has(ROLE_IDS.STAFF)) {
+        roleKey = 'STAFF';
+        highestRole = 'Staff Member';
+      } else if (member.roles.cache.has(ROLE_IDS.ZYZZ_GOD)) {
         roleKey = 'ZYZZ_GOD';
         highestRole = 'Zyzz God';
       } else if (member.roles.cache.has(ROLE_IDS.DONATOR_PLUS_PLUS)) {
@@ -89,127 +88,93 @@ export class SalaryCommand extends Command {
       } else if (member.roles.cache.has(ROLE_IDS.SERVER_BOOSTER)) {
         roleKey = 'SERVER_BOOSTER';
         highestRole = 'Server Booster';
-      } else if (member.roles.cache.has(ROLE_IDS.STAFF)) {
-        roleKey = 'STAFF';
-        highestRole = 'Staff Member';
       }
 
       const role = ROLES[roleKey];
       const hourlyRate = role.hourlyRate;
       const hoursEarned = user.hoursEarned || 0;
-      const lastEarningStart = user.lastEarningStart ? new Date(user.lastEarningStart) : null;
-
-      // Calculate total earnings so far today
+      const maxHours = 8;
       const totalEarnings = hoursEarned * hourlyRate;
 
-      // Calculate minutes until next hour
+      // Create a progress bar for salary
+      const progressBar = this.createProgressBar(hoursEarned, maxHours);
+
+      // Calculate time left for next increment (until next hour)
       const nextHour = new Date();
       nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
-      const minutesUntilNext = Math.floor((nextHour.getTime() - now.getTime()) / 60000);
+      const minutesUntilNext = Math.floor((nextHour.getTime() - now.getTime()) / 60000); // Convert to minutes
 
       const embed = new EmbedBuilder()
-        .setTitle('💰 Salary Information')
+        .setTitle('💰 Salary Progress')
         .setColor('#00FF00')
         .addFields(
           { name: 'Your Role', value: highestRole, inline: true },
           { name: 'Hourly Rate', value: `$${hourlyRate}`, inline: true },
-          { name: 'Hours Credited Today', value: `${hoursEarned}/8`, inline: true },
-          { name: 'Total Earnings Today', value: `$${totalEarnings}`, inline: true }
+          { name: 'Hours Earned Today', value: `${hoursEarned}/${maxHours}`, inline: true },
+          { name: 'Total Earnings Today', value: `$${totalEarnings}`, inline: true },
+          { name: 'Time Until Next Increment', value: `${minutesUntilNext} minutes`, inline: true }
         )
+        .setDescription(`**Salary Progress:**\n${progressBar}`)
         .setFooter({ text: 'Salary is automatically credited hourly, up to 8 hours per day' });
 
-      if (hoursEarned >= 8) {
-        embed.setDescription('✅ You have earned your full salary for today (8 hours = $' + (8 * hourlyRate) + ').\nCome back tomorrow for more earnings!');
-      } else {
-        embed.setDescription(`Next hour's salary of $${hourlyRate} will be credited in ${minutesUntilNext} minutes`);
-      }
+      const response = await interaction.editReply({ embeds: [embed] });
 
-      return interaction.editReply({ embeds: [embed] });
+      // Store the message reference for future updates
+      this.updateSalaryProgress(response, user.id);
+
+      return response;
     } catch (error) {
-      console.error('Error in salary command:', error);
-      return interaction.editReply('An error occurred while checking your salary. Please try again later.');
+      console.error('Error in salary progress command:', error);
+      return interaction.editReply('An error occurred while fetching your salary progress. Please try again later.');
     }
   }
 
-  startSalaryCron() {
-    // Reset salaries at midnight
-    cron.schedule('0 0 * * *', async () => {
-      try {
-        await prisma.user.updateMany({
-          where: {
-            hoursEarned: { gt: 0 }
-          },
-          data: {
-            hoursEarned: 0,
-            lastEarningStart: new Date()
-          }
-        });
-      } catch (error) {
-        console.error('Error resetting salaries:', error);
-      }
-    });
+  // Helper function to create a progress bar
+  createProgressBar(hoursEarned, maxHours) {
+    const filled = '🟩';
+    const empty = '⬛';
+    const progress = Math.floor((hoursEarned / maxHours) * 10);
+    const remaining = 10 - progress;
+    return `${filled.repeat(progress)}${empty.repeat(remaining)} (${hoursEarned}/${maxHours} hours)`;
+  }
 
-    // Credit salary every hour
-    cron.schedule('0 * * * *', async () => {
-      try {
-        const now = new Date();
+  // Function to periodically update the salary progress message
+  async updateSalaryProgress(message, userId) {
+    setInterval(async () => {
+      const user = await prisma.user.findUnique({
+        where: { id: userId }
+      });
 
-        // Get all users who haven't maxed out their hours today
-        const users = await prisma.user.findMany({
-          where: {
-            hoursEarned: { lt: 8 },
-            lastEarningStart: { not: null }
-          }
-        });
+      if (!user) return;
 
-        for (const user of users) {
-          try {
-            const lastEarningStart = new Date(user.lastEarningStart);
-            const hoursPassed = Math.floor((now - lastEarningStart) / 3600000); // Convert ms to hours
+      const hoursEarned = user.hoursEarned || 0;
+      const roleKey = 'STAFF'; // Assuming staff is highest, use the appropriate logic for other roles
+      const role = ROLES[roleKey];
+      const hourlyRate = role.hourlyRate;
+      const maxHours = 8;
+      const totalEarnings = hoursEarned * hourlyRate;
 
-            if (hoursPassed >= 1) {
-              // Fetch the user's guild member to check roles
-              const guild = this.container.client.guilds.cache.first();
-              const member = await guild?.members.fetch(user.id).catch(() => null);
+      const progressBar = this.createProgressBar(hoursEarned, maxHours);
 
-              if (!member) continue;
+      const nextHour = new Date();
+      nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
+      const minutesUntilNext = Math.floor((nextHour.getTime() - new Date().getTime()) / 60000);
 
-              // Determine role and salary
-              let roleKey = 'MEMBER';
-              if (member.roles.cache.has(ROLE_IDS.ZYZZ_GOD)) roleKey = 'ZYZZ_GOD';
-              else if (member.roles.cache.has(ROLE_IDS.DONATOR_PLUS_PLUS)) roleKey = 'DONATOR_PLUS_PLUS';
-              else if (member.roles.cache.has(ROLE_IDS.DONATOR_PLUS)) roleKey = 'DONATOR_PLUS';
-              else if (member.roles.cache.has(ROLE_IDS.DONATOR)) roleKey = 'DONATOR';
-              else if (member.roles.cache.has(ROLE_IDS.SERVER_BOOSTER)) roleKey = 'SERVER_BOOSTER';
-              else if (member.roles.cache.has(ROLE_IDS.STAFF)) roleKey = 'STAFF';
+      const embed = new EmbedBuilder()
+        .setTitle('💰 Salary Progress')
+        .setColor('#00FF00')
+        .addFields(
+          { name: 'Your Role', value: 'Staff Member', inline: true },
+          { name: 'Hourly Rate', value: `$${hourlyRate}`, inline: true },
+          { name: 'Hours Earned Today', value: `${hoursEarned}/${maxHours}`, inline: true },
+          { name: 'Total Earnings Today', value: `$${totalEarnings}`, inline: true },
+          { name: 'Time Until Next Increment', value: `${minutesUntilNext} minutes`, inline: true }
+        )
+        .setDescription(`**Salary Progress:**\n${progressBar}`)
+        .setFooter({ text: 'Salary is automatically credited hourly, up to 8 hours per day' });
 
-              const role = ROLES[roleKey];
-              const hourlyRate = role.hourlyRate;
-
-              // Calculate new hours and earnings, capped at 8 hours
-              const newHours = Math.min(8, user.hoursEarned + 1);
-
-              // Update user's wallet and hours
-              try {
-                await prisma.user.update({
-                  where: { id: user.id },
-                  data: {
-                    wallet: { increment: hourlyRate },
-                    hoursEarned: newHours,
-                    lastEarningStart: now,
-                  },
-                });
-              } catch (error) {
-                console.error(`Error updating wallet for user ${user.id}:`, error);
-              }
-            }
-          } catch (error) {
-            console.error(`Error processing salary for user ${user.id}:`, error);
-          }
-        }
-      } catch (error) {
-        console.error('Error in salary cron job:', error);
-      }
-    });
+      // Edit the message with the updated salary progress
+      await message.edit({ embeds: [embed] });
+    }, 3600000); // Update every hour (3600000 ms)
   }
 }
