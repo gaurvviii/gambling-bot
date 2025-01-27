@@ -30,62 +30,7 @@ client.once("ready", async () => {
 
         // Force register commands to your server
         const guild = await client.guilds.fetch("1325400597117009971"); // done
-        const guildCommands = await guild.commands.set([
-            {
-                name: "slots",
-                description: "Play slots! Bet an amount and try your luck",
-            },
-            {
-                name: "blackjack",
-                description: "Play a game of blackjack",
-            },
-            {
-                name: "roulette",
-                description: "Play roulette with various betting options",
-            },
-            {
-                name: "baccarat",
-                description: "Play baccarat - bet on Player, Banker, or Tie",
-            },
-            {
-                name: "crash",
-                description:
-                    "Play crash game - bet and cash out before it crashes!",
-            },
-            {
-                name: "minesweeper",
-                description: "Play minesweeper - reveal tiles and avoid mines!",
-            },
-            {
-                name: "horserace",
-                description: "Bet on horse races and watch them compete",
-            },
-            {
-                name: "wheel",
-                description: "Spin the Wheel of Fortune",
-            },
-            {
-                name: "rps",
-                description:
-                    "Play Rock-Paper-Scissors against bot or other players",
-            },
-            {
-                name: "bank",
-                description: "Manage your bank account",
-            },
-            {
-                name: "transfer",
-                description: "Transfer money between bank and wallet",
-            },
-            {
-                name: "leaderboard",
-                description: "View various gambling leaderboards",
-            },
-            {
-                name: "fixbalance",
-                description: "Admin command to fix user balance",
-            },
-        ]);
+        const guildCommands = await guild.commands.set([]);
 
         console.log(
             `Successfully registered ${guildCommands.size} commands in ${guild.name}`
