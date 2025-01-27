@@ -14,7 +14,7 @@ export class RPSCommand extends Command {
   constructor(context, options) {
     super(context, {
       ...options,
-      name: 'rps',
+      name: 'rockpaperscissors',
       description: 'Play Rock-Paper-Scissors'
     });
   }

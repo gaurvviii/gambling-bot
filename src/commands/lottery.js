@@ -21,7 +21,7 @@ export class LotteryCommand extends Command {
                 .addSubcommand((subcommand) =>
                     subcommand
                         .setName('create')
-                        .setDescription('Create a new lottery (Admin only)')
+                        .setDescription('Create a new lottery (Owner only)')
                         .addIntegerOption((option) =>
                             option
                                 .setName('prize')
@@ -48,7 +48,7 @@ export class LotteryCommand extends Command {
                 .addSubcommand((subcommand) =>
                     subcommand
                         .setName('draw')
-                        .setDescription('Draw a winner for a lottery (Admin only)')
+                        .setDescription('Draw a winner for a lottery (Owner only)')
                         .addStringOption((option) =>
                             option
                                 .setName('lottery_id')
@@ -83,22 +83,19 @@ export class LotteryCommand extends Command {
     }
 
     async chatInputRun(interaction) {
-        // Check if the interaction is in the correct channel
-    if (interaction.channel.id !== GAMBLING_CHANNEL_ID) {
-        return interaction.reply('You can only access lottery in the gambling channel!');
-      }
+        if (interaction.channel.id !== GAMBLING_CHANNEL_ID) {
+            return interaction.reply('You can only access lottery in the gambling channel!');
+        }
+        
         try {
-                
             await interaction.deferReply({ ephemeral: false });
 
             const subcommand = interaction.options.getSubcommand(true);
 
-            // Get or create user automatically
             let user = await prisma.user.findUnique({
                 where: { id: interaction.user.id }
             });
 
-            // Auto-register if user doesn't exist
             if (!user) {
                 user = await prisma.user.create({
                     data: {
@@ -111,8 +108,8 @@ export class LotteryCommand extends Command {
             }
 
             if (subcommand === 'create' || subcommand === 'draw') {
-                if (!interaction.member.roles.cache.has(ROLE_IDS.ADMIN)) {
-                    return interaction.editReply('❌ This command is only available to administrators!');
+                if (!interaction.member.roles.cache.has(ROLE_IDS.OWNER)) {
+                    return interaction.editReply('❌ This command is only available to the server owner!');
                 }
             }
 

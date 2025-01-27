@@ -22,19 +22,15 @@ export class SalaryCommand extends Command {
 
     async chatInputRun(interaction) {
         try {
-            // Restrict command to the gambling channel
             if (interaction.channelId !== GAMBLING_CHANNEL_ID) {
                 return interaction.reply({
-                    content:
-                        "⚠️ This command can only be used in the gambling channel!",
+                    content: "⚠️ This command can only be used in the gambling channel!",
                     ephemeral: true,
                 });
             }
 
-            // Defer the reply
             await interaction.deferReply({ ephemeral: true });
 
-            // Check if command is used in a guild
             if (!interaction.inGuild()) {
                 return interaction.editReply(
                     "⚠️ This command can only be used in a server, not in DMs."
@@ -42,13 +38,10 @@ export class SalaryCommand extends Command {
             }
 
             const now = new Date();
-
-            // Get or create user automatically
             let user = await prisma.user.findUnique({
                 where: { id: interaction.user.id },
             });
 
-            // Auto-register if user doesn't exist
             if (!user) {
                 user = await prisma.user.create({
                     data: {
@@ -61,7 +54,6 @@ export class SalaryCommand extends Command {
                 });
             }
 
-            // Safely get member and check roles
             const member = await interaction.guild?.members.fetch(
                 interaction.user.id
             );
@@ -74,91 +66,61 @@ export class SalaryCommand extends Command {
             let roleKey = "MEMBER";
             let highestRole = "Basic Member";
 
-            // Define the role hierarchy
             const roleHierarchy = [
                 { id: ROLE_IDS.OWNER, key: "OWNER", name: "Owner" },
                 { id: ROLE_IDS.ADMIN, key: "ADMIN", name: "Admin" },
                 { id: ROLE_IDS.MODERATOR, key: "Moderator", name: "Moderator" },
                 { id: ROLE_IDS.STAFF, key: "Moderator", name: "Staff Member" },
                 { id: ROLE_IDS.ZYZZ_GOD, key: "ZYZZ_GOD", name: "Zyzz God" },
-                {
-                    id: ROLE_IDS.DONATOR_PLUS_PLUS,
-                    key: "DONATOR_PLUS_PLUS",
-                    name: "Donator++",
-                },
-                {
-                    id: ROLE_IDS.DONATOR_PLUS,
-                    key: "DONATOR_PLUS",
-                    name: "Donator+",
-                },
+                { id: ROLE_IDS.DONATOR_PLUS_PLUS, key: "DONATOR_PLUS_PLUS", name: "Donator++" },
+                { id: ROLE_IDS.DONATOR_PLUS, key: "DONATOR_PLUS", name: "Donator+" },
                 { id: ROLE_IDS.DONATOR, key: "DONATOR", name: "Donator" },
-                {
-                    id: ROLE_IDS.SERVER_BOOSTER,
-                    key: "SERVER_BOOSTER",
-                    name: "Server Booster",
-                },
+                { id: ROLE_IDS.SERVER_BOOSTER, key: "SERVER_BOOSTER", name: "Server Booster" },
             ];
 
-            // Check each role in the hierarchy
             for (const role of roleHierarchy) {
                 if (member.roles.cache.has(role.id)) {
                     roleKey = role.key;
                     highestRole = role.name;
-                    break; // Stop once a role is found
+                    break;
                 }
             }
 
-            // If no roles were found, fallback to 'MEMBER' (lowest role)
             if (highestRole === "Basic Member" && !member.roles.cache.size) {
                 roleKey = "MEMBER";
                 highestRole = "Basic Member";
             }
 
-            console.log(
-                `Highest role for ${member.user.username}: ${highestRole} (${roleKey})`
-            );
-
             const role = ROLES[roleKey];
-            const hourlyRate = role.hourlyRate;
+            let hourlyRate = role.hourlyRate;
+            
+            // Check for server booster bonus
+            const isBooster = member.roles.cache.has(ROLE_IDS.SERVER_BOOSTER);
+            if (isBooster) {
+                hourlyRate += 2.5; // Add booster bonus
+            }
+
             const hoursEarned = user.hoursEarned || 0;
             const maxHours = 8;
             const totalEarnings = hoursEarned * hourlyRate;
 
-            // Create a progress bar for salary
             const progressBar = this.createProgressBar(hoursEarned, maxHours);
 
-            // Calculate time left for next increment (until next hour)
             const nextHour = new Date();
             nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
             const minutesUntilNext = Math.floor(
                 (nextHour.getTime() - now.getTime()) / 60000
-            ); // Convert to minutes
+            );
 
             const embed = new EmbedBuilder()
                 .setTitle("💰 Salary Progress")
                 .setColor("#00FF00")
                 .addFields(
                     { name: "Your Role", value: highestRole, inline: true },
-                    {
-                        name: "Hourly Rate",
-                        value: `$${hourlyRate}`,
-                        inline: true,
-                    },
-                    {
-                        name: "Hours Earned Today",
-                        value: `${hoursEarned}/${maxHours}`,
-                        inline: true,
-                    },
-                    {
-                        name: "Total Earnings Today",
-                        value: `$${totalEarnings}`,
-                        inline: true,
-                    },
-                    {
-                        name: "Time Until Next Increment",
-                        value: `${minutesUntilNext} minutes`,
-                        inline: true,
-                    }
+                    { name: "Hourly Rate", value: `$${hourlyRate}${isBooster ? ' (includes $2.5 booster bonus)' : ''}`, inline: true },
+                    { name: "Hours Earned Today", value: `${hoursEarned}/${maxHours}`, inline: true },
+                    { name: "Total Earnings Today", value: `$${totalEarnings}`, inline: true },
+                    { name: "Time Until Next Increment", value: `${minutesUntilNext} minutes`, inline: true }
                 )
                 .setDescription(`**Salary Progress:**\n${progressBar}`)
                 .setFooter({
@@ -166,10 +128,7 @@ export class SalaryCommand extends Command {
                 });
 
             const response = await interaction.editReply({ embeds: [embed] });
-
-            // Store the message reference for future updates
             this.updateSalaryProgress(response, user.id);
-
             return response;
         } catch (error) {
             console.error("Error in salary progress command:", error);
@@ -179,7 +138,6 @@ export class SalaryCommand extends Command {
         }
     }
 
-    // Helper function to create a progress bar
     createProgressBar(hoursEarned, maxHours) {
         const filled = "🟩";
         const empty = "⬛";
@@ -190,7 +148,6 @@ export class SalaryCommand extends Command {
         )} (${hoursEarned}/${maxHours} hours)`;
     }
 
-    // Function to periodically update the salary progress message
     async updateSalaryProgress(message, userId) {
         setInterval(async () => {
             const user = await prisma.user.findUnique({
@@ -199,10 +156,42 @@ export class SalaryCommand extends Command {
 
             if (!user) return;
 
-            const hoursEarned = user.hoursEarned || 0;
-            const roleKey = "STAFF"; // Assuming staff is highest, use the appropriate logic for other roles
+            const member = await message.guild?.members.fetch(userId);
+            if (!member) return;
+
+            let roleKey = "MEMBER";
+            let highestRole = "Basic Member";
+
+            const roleHierarchy = [
+                { id: ROLE_IDS.OWNER, key: "OWNER", name: "Owner" },
+                { id: ROLE_IDS.ADMIN, key: "ADMIN", name: "Admin" },
+                { id: ROLE_IDS.MODERATOR, key: "Moderator", name: "Moderator" },
+                { id: ROLE_IDS.STAFF, key: "Moderator", name: "Staff Member" },
+                { id: ROLE_IDS.ZYZZ_GOD, key: "ZYZZ_GOD", name: "Zyzz God" },
+                { id: ROLE_IDS.DONATOR_PLUS_PLUS, key: "DONATOR_PLUS_PLUS", name: "Donator++" },
+                { id: ROLE_IDS.DONATOR_PLUS, key: "DONATOR_PLUS", name: "Donator+" },
+                { id: ROLE_IDS.DONATOR, key: "DONATOR", name: "Donator" },
+                { id: ROLE_IDS.SERVER_BOOSTER, key: "SERVER_BOOSTER", name: "Server Booster" },
+            ];
+
+            for (const role of roleHierarchy) {
+                if (member.roles.cache.has(role.id)) {
+                    roleKey = role.key;
+                    highestRole = role.name;
+                    break;
+                }
+            }
+
             const role = ROLES[roleKey];
-            const hourlyRate = role.hourlyRate;
+            let hourlyRate = role.hourlyRate;
+            
+            // Check for server booster bonus
+            const isBooster = member.roles.cache.has(ROLE_IDS.SERVER_BOOSTER);
+            if (isBooster) {
+                hourlyRate += 2.5; // Add booster bonus
+            }
+
+            const hoursEarned = user.hoursEarned || 0;
             const maxHours = 8;
             const totalEarnings = hoursEarned * hourlyRate;
 
@@ -218,35 +207,18 @@ export class SalaryCommand extends Command {
                 .setTitle("💰 Salary Progress")
                 .setColor("#00FF00")
                 .addFields(
-                    { name: "Your Role", value: "Staff Member", inline: true },
-                    {
-                        name: "Hourly Rate",
-                        value: `$${hourlyRate}`,
-                        inline: true,
-                    },
-                    {
-                        name: "Hours Earned Today",
-                        value: `${hoursEarned}/${maxHours}`,
-                        inline: true,
-                    },
-                    {
-                        name: "Total Earnings Today",
-                        value: `$${totalEarnings}`,
-                        inline: true,
-                    },
-                    {
-                        name: "Time Until Next Increment",
-                        value: `${minutesUntilNext} minutes`,
-                        inline: true,
-                    }
+                    { name: "Your Role", value: highestRole, inline: true },
+                    { name: "Hourly Rate", value: `$${hourlyRate}${isBooster ? ' (includes $2.5 booster bonus)' : ''}`, inline: true },
+                    { name: "Hours Earned Today", value: `${hoursEarned}/${maxHours}`, inline: true },
+                    { name: "Total Earnings Today", value: `$${totalEarnings}`, inline: true },
+                    { name: "Time Until Next Increment", value: `${minutesUntilNext} minutes`, inline: true }
                 )
                 .setDescription(`**Salary Progress:**\n${progressBar}`)
                 .setFooter({
                     text: "Salary is automatically credited hourly, up to 8 hours per day",
                 });
 
-            // Edit the message with the updated salary progress
             await message.edit({ embeds: [embed] });
-        }, 3600000); // Update every hour (3600000 ms)
+        }, 3600000);
     }
 }

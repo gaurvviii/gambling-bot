@@ -2,13 +2,13 @@ import { Command } from '@sapphire/framework';
 import { prisma } from '../lib/database.js';
 import ROLE_IDS from '../config/roleIds.js';
 import { GAMBLING_CHANNEL_ID } from '../config/constants.js';
- 
-export class FixBalanceCommand extends Command {
+
+export class CheckBalanceCommand extends Command {
   constructor(context, options) {
     super(context, {
       ...options,
-      name: 'fixbalance',
-      description: 'Admin command to fix user balance'
+      name: 'checkbalance',
+      description: 'Admin command to check user balance'
     });
   }
 
@@ -20,19 +20,7 @@ export class FixBalanceCommand extends Command {
         .addUserOption(option =>
           option
             .setName('user')
-            .setDescription('User to fix balance for')
-            .setRequired(true)
-        )
-        .addIntegerOption(option =>
-          option
-            .setName('bank')
-            .setDescription('New bank balance')
-            .setRequired(true)
-        )
-        .addIntegerOption(option =>
-          option
-            .setName('wallet')
-            .setDescription('New wallet balance')
+            .setDescription('User to check balance for')
             .setRequired(true)
         )
     );
@@ -59,48 +47,35 @@ export class FixBalanceCommand extends Command {
       await interaction.deferReply({ ephemeral: true });
 
       const targetUser = interaction.options.getUser('user');
-      const newBank = interaction.options.getInteger('bank');
-      const newWallet = interaction.options.getInteger('wallet');
 
-      // Get or create user automatically
-      let user = await prisma.user.findUnique({
+      // Fetch user balance from the database
+      const user = await prisma.user.findUnique({
         where: { id: targetUser.id }
       });
 
-      // Auto-register if user doesn't exist
       if (!user) {
-        user = await prisma.user.create({
-          data: {
-            id: targetUser.id,
-            wallet: 0,
-            bank: 1000,
-            hoursEarned: 0
-          }
+        return interaction.editReply({
+          content: `❌ User ${targetUser.username} does not exist in the database.`,
+          ephemeral: true
         });
       }
 
-      const updatedUser = await prisma.user.update({
-        where: { id: targetUser.id },
-        data: {
-          bank: newBank,
-          wallet: newWallet
-        }
-      });
-
       return interaction.editReply({
-        content: `✅ Balance Fixed for ${targetUser.username}!\nNew Bank Balance: $${updatedUser.bank}\nNew Wallet Balance: $${updatedUser.wallet}`,
+        content: `✅ Balance for ${targetUser.username}:
+Bank Balance: $${user.bank}
+Wallet Balance: $${user.wallet}`,
         ephemeral: true
       });
     } catch (error) {
-      console.error('Error in fixbalance command:', error);
+      console.error('Error in checkbalance command:', error);
       if (!interaction.deferred) {
         return interaction.reply({
-          content: '❌ Error fixing balance. Please try again.',
+          content: '❌ Error fetching balance. Please try again.',
           ephemeral: true
         });
       }
       return interaction.editReply({
-        content: '❌ Error fixing balance. Please try again.',
+        content: '❌ Error fetching balance. Please try again.',
         ephemeral: true
       });
     }

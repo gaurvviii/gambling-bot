@@ -6,15 +6,12 @@ import ROLES from '../config/salaries.js';
 export class SalaryCronJob {
   constructor(client) {
     this.client = client;
-    this.guildId = '1325400597117009971'; // server id done
+    this.guildId = '1325400597117009971';
     this.startSalaryCron();
   }
 
   startSalaryCron() {
-    // Reset salaries at midnight
     cron.schedule('0 0 * * *', () => this.resetSalaries());
-
-    // Credit salary every hour, up to 8 hours per day
     cron.schedule('0 * * * *', () => this.creditHourlySalaries());
   }
 
@@ -45,16 +42,13 @@ export class SalaryCronJob {
         return;
       }
 
-      // Fetch all guild members
       const members = await guild.members.fetch();
 
       for (const member of members.values()) {
         try {
-          // Check if the user exists in the database
           let user = await prisma.user.findUnique({ where: { id: member.id } });
 
           if (!user) {
-            // Create a new user if they are not found
             user = await prisma.user.create({
               data: {
                 id: member.id,
@@ -67,12 +61,10 @@ export class SalaryCronJob {
             console.log(`Created a new user entry for ${member.id}`);
           }
 
-          // Determine the time passed since the last earning start
           const lastEarningStart = new Date(user.lastEarningStart);
           const hoursPassed = Math.floor((now - lastEarningStart) / 3600000);
 
           if (hoursPassed >= 1 && user.hoursEarned < 8) {
-            // Determine the user's highest role dynamically
             const roleKey = this.determineHighestRole(member);
             const role = ROLES[roleKey];
 
@@ -81,12 +73,16 @@ export class SalaryCronJob {
               continue;
             }
 
-            const hourlyRate = role.hourlyRate;
+            let hourlyRate = role.hourlyRate;
+            
+            // Add booster bonus if they are a server booster
+            const isBooster = member.roles.cache.has(ROLE_IDS.SERVER_BOOSTER);
+            if (isBooster) {
+              hourlyRate += 2.5; // Add booster bonus
+            }
 
-            // Calculate new hours (capped at 8)
             const newHours = Math.min(8, user.hoursEarned + hoursPassed);
 
-            // Update the user's wallet and hours
             await prisma.user.update({
               where: { id: user.id },
               data: {
@@ -96,7 +92,7 @@ export class SalaryCronJob {
               }
             });
 
-            console.log(`Credited ${hourlyRate * hoursPassed} to user ${user.id} (${roleKey})`);
+            console.log(`Credited ${hourlyRate * hoursPassed} to user ${user.id} (${roleKey}${isBooster ? ' + Booster Bonus' : ''})`);
           }
         } catch (error) {
           console.error(`Error processing salary for member ${member.id}:`, error);
@@ -108,7 +104,6 @@ export class SalaryCronJob {
   }
 
   determineHighestRole(member) {
-    // Check roles in order of highest to lowest priority
     const roleHierarchy = [
       { id: ROLE_IDS.STAFF, key: 'STAFF' },
       { id: ROLE_IDS.ZYZZ_GOD, key: 'ZYZZ_GOD' },
@@ -125,6 +120,6 @@ export class SalaryCronJob {
       }
     }
 
-    return 'MEMBER'; // Default role
+    return 'MEMBER';
   }
 }

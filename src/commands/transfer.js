@@ -7,7 +7,7 @@ export class TransferCommand extends Command {
     super(context, {
       ...options,
       name: 'transfer',
-      description: 'Transfer money between bank and wallet',
+      description: 'Transfer money between bank and wallet or to other users',
     });
   }
 
@@ -23,7 +23,8 @@ export class TransferCommand extends Command {
             .setRequired(true)
             .addChoices(
               { name: 'Wallet to Bank', value: 'toBank' },
-              { name: 'Bank to Wallet', value: 'toWallet' }
+              { name: 'Bank to Wallet', value: 'toWallet' },
+              { name: 'To Other User', value: 'toUser' }
             )
         )
         .addIntegerOption((option) =>
@@ -32,6 +33,12 @@ export class TransferCommand extends Command {
             .setDescription('Amount to transfer')
             .setRequired(true)
             .setMinValue(1)
+        )
+        .addUserOption((option) =>
+          option
+            .setName('target')
+            .setDescription('Target user (only for transferring to another user)')
+            .setRequired(false)
         )
     );
   }
@@ -51,6 +58,7 @@ export class TransferCommand extends Command {
 
       const type = interaction.options.getString('type');
       const amount = interaction.options.getInteger('amount');
+      const targetUser = interaction.options.getUser('target');
 
       // Get or create user automatically
       let user = await prisma.user.findUnique({
@@ -113,6 +121,58 @@ Transferred $${amount} to bank.
 Transferred $${amount} to wallet.
 **New Wallet Balance:** $${updatedUser.wallet}
 **New Bank Balance:** $${updatedUser.bank}
+          `,
+        });
+      } else if (type === 'toUser') {
+        if (!targetUser) {
+          return interaction.editReply({
+            content: '❌ You must specify a target user to transfer money to!',
+          });
+        }
+
+        if (user.wallet < amount) {
+          return interaction.editReply({
+            content: `❌ Insufficient funds in wallet! You have $${user.wallet}`,
+          });
+        }
+
+        let target = await prisma.user.findUnique({
+          where: { id: targetUser.id },
+        });
+
+        // Auto-register target user if they don't exist
+        if (!target) {
+          target = await prisma.user.create({
+            data: {
+              id: targetUser.id,
+              wallet: 0,
+              bank: 1000,
+              hoursEarned: 0,
+            },
+          });
+        }
+
+        // Perform the transfer
+        const updatedSender = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            wallet: { decrement: amount },
+          },
+        });
+
+        const updatedTarget = await prisma.user.update({
+          where: { id: target.id },
+          data: {
+            wallet: { increment: amount },
+          },
+        });
+
+        return interaction.editReply({
+          content: `
+✅ Transfer Successful!
+Transferred $${amount} to ${targetUser.username}.
+**Your New Wallet Balance:** $${updatedSender.wallet}
+**${targetUser.username}'s New Wallet Balance:** $${updatedTarget.wallet}
           `,
         });
       }
