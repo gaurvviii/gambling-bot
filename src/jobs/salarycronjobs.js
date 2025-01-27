@@ -1,11 +1,12 @@
 import cron from 'node-cron';
 import { prisma } from '../lib/database.js';
-import  ROLE_IDS from '../config/roleIds.js';
-import  ROLES  from '../config/salaries.js';
+import ROLE_IDS from '../config/roleIds.js';
+import ROLES from '../config/salaries.js';
 
 export class SalaryCronJob {
   constructor(client) {
     this.client = client;
+    this.guildId = '1325400597117009971'; // server id done
     this.startSalaryCron();
   }
 
@@ -37,10 +38,10 @@ export class SalaryCronJob {
   async creditHourlySalaries() {
     try {
       const now = new Date();
-      const guild = this.client.guilds.cache.first();
+      const guild = this.client.guilds.cache.get(this.guildId);
 
       if (!guild) {
-        console.error('No guild found');
+        console.error(`Guild with ID ${this.guildId} not found`);
         return;
       }
 
@@ -58,7 +59,7 @@ export class SalaryCronJob {
               data: {
                 id: member.id,
                 bank: 1000,
-                wallet:0,
+                wallet: 0,
                 hoursEarned: 0,
                 lastEarningStart: now
               }
@@ -71,25 +72,31 @@ export class SalaryCronJob {
           const hoursPassed = Math.floor((now - lastEarningStart) / 3600000);
 
           if (hoursPassed >= 1 && user.hoursEarned < 8) {
-            // Determine the user's highest role
+            // Determine the user's highest role dynamically
             const roleKey = this.determineHighestRole(member);
             const role = ROLES[roleKey];
+
+            if (!role || !role.hourlyRate) {
+              console.error(`Role or hourly rate not found for ${roleKey}`);
+              continue;
+            }
+
             const hourlyRate = role.hourlyRate;
 
             // Calculate new hours (capped at 8)
-            const newHours = Math.min(8, user.hoursEarned + 1);
+            const newHours = Math.min(8, user.hoursEarned + hoursPassed);
 
             // Update the user's wallet and hours
             await prisma.user.update({
               where: { id: user.id },
               data: {
-                bank: { increment: hourlyRate },
+                wallet: { increment: hourlyRate * hoursPassed },
                 hoursEarned: newHours,
                 lastEarningStart: now
               }
             });
 
-            console.log(`Credited ${hourlyRate} to user ${user.id} (${roleKey})`);
+            console.log(`Credited ${hourlyRate * hoursPassed} to user ${user.id} (${roleKey})`);
           }
         } catch (error) {
           console.error(`Error processing salary for member ${member.id}:`, error);
@@ -109,7 +116,7 @@ export class SalaryCronJob {
       { id: ROLE_IDS.DONATOR_PLUS, key: 'DONATOR_PLUS' },
       { id: ROLE_IDS.DONATOR, key: 'DONATOR' },
       { id: ROLE_IDS.SERVER_BOOSTER, key: 'SERVER_BOOSTER' },
-      { id: ROLE_IDS.MEMBER, key: 'MEMBER'}
+      { id: ROLE_IDS.MEMBER, key: 'MEMBER' }
     ];
 
     for (const role of roleHierarchy) {
