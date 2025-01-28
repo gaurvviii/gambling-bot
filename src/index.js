@@ -26,6 +26,7 @@ client.once("ready", async () => {
     try {
         // Fetch all global commands
         const globalCommands = await client.application?.commands.fetch();
+        await client.application.commands.set([]);
         console.log(`Current global commands: ${globalCommands?.size ?? 0}`);
 
         // Fetch the guild you want to register the commands in
