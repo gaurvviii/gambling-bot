@@ -6,7 +6,7 @@ import ROLES from '../config/salaries.js';
 export class SalaryCronJob {
   constructor(client) {
     this.client = client;
-    this.guildId = '1325400597117009971';
+    this.guildId = '1325400597117009971';//done
     this.startSalaryCron();
   }
 
@@ -105,13 +105,16 @@ export class SalaryCronJob {
 
   determineHighestRole(member) {
     const roleHierarchy = [
-      { id: ROLE_IDS.STAFF, key: 'STAFF' },
-      { id: ROLE_IDS.ZYZZ_GOD, key: 'ZYZZ_GOD' },
-      { id: ROLE_IDS.DONATOR_PLUS_PLUS, key: 'DONATOR_PLUS_PLUS' },
-      { id: ROLE_IDS.DONATOR_PLUS, key: 'DONATOR_PLUS' },
-      { id: ROLE_IDS.DONATOR, key: 'DONATOR' },
-      { id: ROLE_IDS.SERVER_BOOSTER, key: 'SERVER_BOOSTER' },
-      { id: ROLE_IDS.MEMBER, key: 'MEMBER' }
+      { id: ROLE_IDS.OWNER, key: "OWNER", name: "Owner" },
+                { id: ROLE_IDS.ADMIN, key: "ADMIN", name: "Admin" },
+                { id: ROLE_IDS.MODERATOR, key: "MODERATOR", name: "Moderator" },
+                { id: ROLE_IDS.STAFF, key: "STAFF", name: "Staff Member" },
+                { id: ROLE_IDS.DEVELOPER, key: "DEVELOPER", name: "Developer" },
+                { id: ROLE_IDS.ZYZZ_GOD, key: "ZYZZ_GOD", name: "Zyzz God" },
+                { id: ROLE_IDS.DONATOR_PLUS_PLUS, key: "DONATOR_PLUS_PLUS", name: "Donator++" },
+                { id: ROLE_IDS.DONATOR_PLUS, key: "DONATOR_PLUS", name: "Donator+" },
+                { id: ROLE_IDS.DONATOR, key: "DONATOR", name: "Donator" },
+                { id: ROLE_IDS.SERVER_BOOSTER, key: "SERVER_BOOSTER", name: "Server Booster" },
     ];
 
     for (const role of roleHierarchy) {

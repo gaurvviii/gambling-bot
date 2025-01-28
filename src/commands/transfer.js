@@ -24,7 +24,7 @@ export class TransferCommand extends Command {
             .addChoices(
               { name: 'Wallet to Bank', value: 'toBank' },
               { name: 'Bank to Wallet', value: 'toWallet' },
-              { name: 'To Other User', value: 'toUser' }
+              { name: 'to other user', value: 'toUser' }
             )
         )
         .addIntegerOption((option) =>
@@ -36,8 +36,8 @@ export class TransferCommand extends Command {
         )
         .addUserOption((option) =>
           option
-            .setName('target')
-            .setDescription('Target user (only for transferring to another user)')
+            .setName('user') 
+            .setDescription('User (only for transferring to another user)')
             .setRequired(false)
         )
     );
@@ -58,7 +58,7 @@ export class TransferCommand extends Command {
 
       const type = interaction.options.getString('type');
       const amount = interaction.options.getInteger('amount');
-      const targetUser = interaction.options.getUser('target');
+      const userOption = interaction.options.getUser('user'); // Get the user to transfer money to
 
       // Get or create user automatically
       let user = await prisma.user.findUnique({
@@ -124,9 +124,9 @@ Transferred $${amount} to wallet.
           `,
         });
       } else if (type === 'toUser') {
-        if (!targetUser) {
+        if (!userOption) {
           return interaction.editReply({
-            content: '❌ You must specify a target user to transfer money to!',
+            content: '❌ You must specify a user to transfer money to!',
           });
         }
 
@@ -136,15 +136,15 @@ Transferred $${amount} to wallet.
           });
         }
 
-        let target = await prisma.user.findUnique({
-          where: { id: targetUser.id },
+        let recipient = await prisma.user.findUnique({
+          where: { id: userOption.id },
         });
 
-        // Auto-register target user if they don't exist
-        if (!target) {
-          target = await prisma.user.create({
+        // Auto-register recipient user if they don't exist
+        if (!recipient) {
+          recipient = await prisma.user.create({
             data: {
-              id: targetUser.id,
+              id: userOption.id,
               wallet: 0,
               bank: 1000,
               hoursEarned: 0,
@@ -160,8 +160,8 @@ Transferred $${amount} to wallet.
           },
         });
 
-        const updatedTarget = await prisma.user.update({
-          where: { id: target.id },
+        const updatedRecipient = await prisma.user.update({
+          where: { id: recipient.id },
           data: {
             wallet: { increment: amount },
           },
@@ -170,9 +170,7 @@ Transferred $${amount} to wallet.
         return interaction.editReply({
           content: `
 ✅ Transfer Successful!
-Transferred $${amount} to ${targetUser.username}.
-**Your New Wallet Balance:** $${updatedSender.wallet}
-**${targetUser.username}'s New Wallet Balance:** $${updatedTarget.wallet}
+Transferred $${amount} to ${userOption.username}.
           `,
         });
       }

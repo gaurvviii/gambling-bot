@@ -29,8 +29,19 @@ export class CrashCommand extends Command {
     );
   }
 
+  generateCrashPoint() {
+    // Generate crash point between 1 and 6
+    return Math.min(6.00, Math.max(1.00, (Math.random() * 5) + 1));
+  }
+
+  getGameState(multiplier) {
+    return `
+🚀 Crash Game 🚀
+Current Multiplier: ${multiplier.toFixed(2)}x
+    `;
+  }
+
   async chatInputRun(interaction) {
-    // Check if command is used in gambling channel
     if (interaction.channelId !== GAMBLING_CHANNEL_ID) {
       return interaction.reply({
         content: '⚠️ This command can only be used in the gambling channel!',
@@ -48,12 +59,10 @@ export class CrashCommand extends Command {
 
       const bet = interaction.options.getInteger('bet');
 
-      // Get or create user automatically
       let user = await prisma.user.findUnique({
         where: { id: userId }
       });
 
-      // Auto-register if user doesn't exist
       if (!user) {
         user = await prisma.user.create({
           data: {
@@ -69,7 +78,6 @@ export class CrashCommand extends Command {
         return interaction.editReply('Insufficient funds in wallet!');
       }
 
-      // Deduct bet using Prisma transaction
       await prisma.user.update({
         where: { id: userId },
         data: {
@@ -78,8 +86,7 @@ export class CrashCommand extends Command {
       });
 
       const crashPoint = this.generateCrashPoint();
-      let multiplier = 1.0;
-      let gameInterval;
+      let multiplier = 1.00;
       let hasEnded = false;
 
       const cashoutButton = new ButtonBuilder()
@@ -95,8 +102,7 @@ export class CrashCommand extends Command {
       });
 
       const collector = response.createMessageComponentCollector({
-        filter: i => i.user.id === userId && !hasEnded,
-        time: 20000
+        filter: (i) => i.user.id === userId && !hasEnded,
       });
 
       games.set(userId, {
@@ -105,7 +111,7 @@ export class CrashCommand extends Command {
         active: true
       });
 
-      gameInterval = setInterval(async () => {
+      let gameInterval = setInterval(async () => {
         try {
           if (hasEnded) {
             clearInterval(gameInterval);
@@ -113,17 +119,36 @@ export class CrashCommand extends Command {
           }
 
           multiplier += 0.1;
+          
           if (multiplier >= crashPoint) {
             clearInterval(gameInterval);
             hasEnded = true;
-            collector.stop('crash');
-            await this.endGame(interaction, userId, 0, multiplier);
-          } else {
             await interaction.editReply({
-              content: this.getGameState(multiplier),
-              components: [row]
+              content: null,
+              embeds: [{
+                title: "💥 CRASHED!",
+                description: `The game crashed at **${crashPoint.toFixed(2)}x**\nYou lost **$${bet}**!`,
+                color: 0xFF0000
+              }],
+              components: []
             });
+            
+            await prisma.user.update({
+              where: { id: userId },
+              data: {
+                totalLost: { increment: bet }
+              }
+            });
+            
+            collector.stop('crash');
+            games.delete(userId);
+            return;
           }
+
+          await interaction.editReply({
+            content: this.getGameState(multiplier),
+            components: [row]
+          });
         } catch (error) {
           console.error('Error in game interval:', error);
           clearInterval(gameInterval);
@@ -139,8 +164,18 @@ export class CrashCommand extends Command {
             hasEnded = true;
             clearInterval(gameInterval);
             const winnings = Math.floor(bet * multiplier);
-            await this.endGame(interaction, userId, winnings, multiplier);
+            await interaction.editReply({
+              content: `🎉 Cashed out at ${multiplier.toFixed(2)}x!\nYou won $${winnings}!`,
+              components: []
+            });
+            await prisma.user.update({
+              where: { id: userId },
+              data: {
+                wallet: { increment: winnings }
+              }
+            });
             collector.stop('cashout');
+            games.delete(userId);
           }
         } catch (error) {
           console.error('Error in collector:', error);
@@ -157,23 +192,35 @@ export class CrashCommand extends Command {
 
       collector.on('end', async (collected, reason) => {
         try {
-          if (reason === 'crash' && !hasEnded) {
-            await interaction.editReply({
-              content: `💥 Crashed at ${crashPoint.toFixed(1)}x!\nYou lost $${bet}!`,
-              components: []
-            });
-          } else if (reason === 'error') {
-            await interaction.editReply({
-              content: 'An error occurred during the game. Your bet has been refunded.',
-              components: []
-            });
-            // Refund the bet
-            await prisma.user.update({
-              where: { id: userId },
-              data: {
-                wallet: { increment: bet }
-              }
-            });
+          const game = games.get(userId);
+          if (!game) return;
+
+          if (!hasEnded) {
+            hasEnded = true;
+            clearInterval(gameInterval);
+            
+            if (reason === 'crash') {
+              await interaction.editReply({
+                content: null,
+                embeds: [{
+                  title: "💥 CRASHED!",
+                  description: `The game crashed at **${crashPoint.toFixed(2)}x**\nYou lost **$${game.bet}**!`,
+                  color: 0xFF0000
+                }],
+                components: []
+              });
+            } else if (reason === 'max') {
+              await interaction.editReply({
+                content: `🎉 Maximum multiplier reached! (6.00x)\nYou won $${Math.floor(bet * 6)}!`,
+                components: []
+              });
+              await prisma.user.update({
+                where: { id: userId },
+                data: {
+                  wallet: { increment: bet }
+                }
+              });
+            }
           }
           games.delete(userId);
         } catch (error) {
@@ -193,40 +240,36 @@ export class CrashCommand extends Command {
     }
   }
 
-  generateCrashPoint() {
-    return Math.max(1.0, (Math.random() * 2 + 1) * (Math.random() * 2 + 1));
-  }
-
-  getGameState(multiplier) {
-    return `
-🚀 Crash Game 🚀
-Current Multiplier: ${multiplier.toFixed(1)}x
-    `;
-  }
-
-  async endGame(interaction, userId, winnings, finalMultiplier) {
+  async endGame(interaction, userId, winnings, finalMultiplier, crashPoint) {
     try {
       const game = games.get(userId);
       if (!game) return;
-      
-      games.delete(userId);
 
       if (winnings > 0) {
         await prisma.user.update({
           where: { id: userId },
           data: {
-            wallet: { increment: winnings },
-            totalWon: { increment: winnings - game.bet }
+            wallet: { increment: Math.floor(winnings) }
           }
         });
 
         await interaction.editReply({
           content: `
-🎉 Cashed out at ${finalMultiplier.toFixed(1)}x!
-You won $${winnings}!`,
+🎉 Cashed out at ${finalMultiplier.toFixed(2)}x!
+You won $${Math.floor(winnings)}!`,
           components: []
         });
       } else {
+        await interaction.editReply({
+          content: null,
+          embeds: [{
+            title: "💥 CRASHED!",
+            description: `The game crashed at **${crashPoint.toFixed(2)}x**\nYou lost **$${game.bet}**!`,
+            color: 0xFF0000
+          }],
+          components: []
+        });
+        
         await prisma.user.update({
           where: { id: userId },
           data: {

@@ -49,14 +49,19 @@ export class CheckBalanceCommand extends Command {
       const targetUser = interaction.options.getUser('user');
 
       // Fetch user balance from the database
-      const user = await prisma.user.findUnique({
+      let user = await prisma.user.findUnique({
         where: { id: targetUser.id }
       });
 
+      // Auto-register if user doesn't exist
       if (!user) {
-        return interaction.editReply({
-          content: `❌ User ${targetUser.username} does not exist in the database.`,
-          ephemeral: true
+        user = await prisma.user.create({
+          data: {
+            id: targetUser.id,
+            wallet: 0,
+            bank: 1000,
+            hoursEarned: 0
+          }
         });
       }
 

@@ -69,8 +69,9 @@ export class SalaryCommand extends Command {
             const roleHierarchy = [
                 { id: ROLE_IDS.OWNER, key: "OWNER", name: "Owner" },
                 { id: ROLE_IDS.ADMIN, key: "ADMIN", name: "Admin" },
-                { id: ROLE_IDS.MODERATOR, key: "Moderator", name: "Moderator" },
-                { id: ROLE_IDS.STAFF, key: "Moderator", name: "Staff Member" },
+                { id: ROLE_IDS.MODERATOR, key: "MODERATOR", name: "Moderator" },
+                { id: ROLE_IDS.STAFF, key: "STAFF", name: "Staff Member" },
+                { id: ROLE_IDS.DEVELOPER, key: "DEVELOPER", name: "Developer" },
                 { id: ROLE_IDS.ZYZZ_GOD, key: "ZYZZ_GOD", name: "Zyzz God" },
                 { id: ROLE_IDS.DONATOR_PLUS_PLUS, key: "DONATOR_PLUS_PLUS", name: "Donator++" },
                 { id: ROLE_IDS.DONATOR_PLUS, key: "DONATOR_PLUS", name: "Donator+" },
@@ -165,8 +166,9 @@ export class SalaryCommand extends Command {
             const roleHierarchy = [
                 { id: ROLE_IDS.OWNER, key: "OWNER", name: "Owner" },
                 { id: ROLE_IDS.ADMIN, key: "ADMIN", name: "Admin" },
-                { id: ROLE_IDS.MODERATOR, key: "Moderator", name: "Moderator" },
-                { id: ROLE_IDS.STAFF, key: "Moderator", name: "Staff Member" },
+                { id: ROLE_IDS.MODERATOR, key: "MODERATOR", name: "Moderator" },
+                { id: ROLE_IDS.STAFF, key: "STAFF", name: "Staff Member" },
+                { id: ROLE_IDS.DEVELOPER, key: "DEVELOPER", name: "Developer" },
                 { id: ROLE_IDS.ZYZZ_GOD, key: "ZYZZ_GOD", name: "Zyzz God" },
                 { id: ROLE_IDS.DONATOR_PLUS_PLUS, key: "DONATOR_PLUS_PLUS", name: "Donator++" },
                 { id: ROLE_IDS.DONATOR_PLUS, key: "DONATOR_PLUS", name: "Donator+" },
@@ -208,7 +210,7 @@ export class SalaryCommand extends Command {
                 .setColor("#00FF00")
                 .addFields(
                     { name: "Your Role", value: highestRole, inline: true },
-                    { name: "Hourly Rate", value: `$${hourlyRate}${isBooster ? ' (includes $2.5 booster bonus)' : ''}`, inline: true },
+                    { name: "Hourly Rate", value: `$${hourlyRate}${isBooster ? ' (includes $2.5 Server Booster bonus!)' : ''}`, inline: true },
                     { name: "Hours Earned Today", value: `${hoursEarned}/${maxHours}`, inline: true },
                     { name: "Total Earnings Today", value: `$${totalEarnings}`, inline: true },
                     { name: "Time Until Next Increment", value: `${minutesUntilNext} minutes`, inline: true }

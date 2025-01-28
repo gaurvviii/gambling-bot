@@ -35,6 +35,12 @@ const ROLES = {
         hoursPerDay: 8,
         daysPerWeek: 5,
     },
+    DEVELOPER: {
+        name: "Developer",
+        hourlyRate: 100.0,
+        hoursPerDay: 8,
+        daysPerWeek: 5,
+    },
     STAFF: {
         name: "Staff",
         hourlyRate: 100.0,

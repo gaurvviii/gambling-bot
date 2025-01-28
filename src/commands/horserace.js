@@ -3,11 +3,11 @@ import { prisma } from '../lib/database.js';
 import { GAMBLING_CHANNEL_ID } from '../config/constants.js';
 
 const HORSES = [
-  { name: '🐎 Thunderbolt', odds: 2.0 },
-  { name: '🐎 Shadow Runner', odds: 3.0 },
-  { name: '🐎 Lucky Star', odds: 4.0 },
-  { name: '🐎 Silver Wind', odds: 5.0 },
-  { name: '🐎 Golden Flash', odds: 6.0 }
+  { name: '🐎 Thunderbolt' },
+  { name: '🐎 Shadow Runner' },
+  { name: '🐎 Lucky Star' },
+  { name: '🐎 Silver Wind' },
+  { name: '🐎 Golden Flash' }
 ];
 
 const TRACK_LENGTH = 15;
@@ -32,7 +32,7 @@ export class HorseRaceCommand extends Command {
       }
 
       // Defer the reply
-      await interaction.deferReply({ephemeral: true});
+      await interaction.deferReply({ ephemeral: true });
 
       // Parse inputs
       const bet = interaction.options.getInteger('bet');
@@ -55,7 +55,7 @@ export class HorseRaceCommand extends Command {
         user = await prisma.user.create({
           data: {
             id: interaction.user.id,
-            wallet: 0, 
+            wallet: 0,
             bank: 1000,
             hoursEarned: 0,
           },
@@ -77,27 +77,29 @@ export class HorseRaceCommand extends Command {
 
       // Initialize the race
       const positions = HORSES.map(() => 0);
-      const selectedHorse = HORSES[horseNumber];
       let raceFinished = false;
       let winner = null;
 
-      // Announce race countdown
-      for (let i = 3; i > 0; i--) {
-        await interaction.editReply(`🏁 Race starting in ${i}...`);
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
-
+      // Pre-determine the winner randomly
+      const winningHorseIndex = Math.floor(Math.random() * HORSES.length);
+      
       // Start the race
       while (!raceFinished) {
-        HORSES.forEach((horse, index) => {
-          if (Math.random() < 1 / horse.odds) {
-            positions[index]++;
+        // Give the winning horse a slightly higher chance to advance
+        for (let i = 0; i < HORSES.length; i++) {
+          const moveChance = Math.random();
+          if (i === winningHorseIndex) {
+            if (moveChance > 0.4) positions[i]++; // 60% chance to move
+          } else {
+            if (moveChance > 0.5) positions[i]++; // 50% chance to move
           }
-          if (positions[index] >= TRACK_LENGTH) {
-            raceFinished = true;
-            winner = index;
-          }
-        });
+        }
+
+        // Check if winning horse reached the finish
+        if (positions[winningHorseIndex] >= TRACK_LENGTH) {
+          raceFinished = true;
+          winner = winningHorseIndex;
+        }
 
         // Visualize the race track
         const track = HORSES.map((horse, index) => {
@@ -118,7 +120,7 @@ export class HorseRaceCommand extends Command {
       // Determine the winner
       const winningHorse = HORSES[winner];
       const won = winner === horseNumber;
-      const winnings = won ? Math.floor(bet * winningHorse.odds) : 0;
+      const winnings = won ? Math.floor(bet * 2) : 0;
 
       // Update user's balance
       if (won) {
@@ -142,7 +144,7 @@ export class HorseRaceCommand extends Command {
       await interaction.editReply(`
 🏁 **Race Finished!** 🏁
 Winner: **${winningHorse.name}**
-${won ? `🎉 Congratulations! You won $${winnings}!` : '😢 Better luck next time!'}
+${won ? `🎉 Congratulations! You won $${winnings}!` : 'You Lost😢 Better luck next time!'}
       `);
     } catch (error) {
       console.error('Error in HorseRaceCommand:', error);

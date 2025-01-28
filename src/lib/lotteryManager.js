@@ -29,7 +29,6 @@ async function drawExpiredLotteries() {
       });
       continue;
     }
-
     // Randomly select a winner
     const winnerTicket = lottery.tickets[Math.floor(Math.random() * lottery.tickets.length)];
     
@@ -51,3 +50,7 @@ async function drawExpiredLotteries() {
 
 // Set an interval to check for expired lotteries every minute
 setInterval(drawExpiredLotteries, 60000); 
+
+export function generateShortId() {
+  return Math.random().toString(36).substring(2, 7);  // Generates a random string of 5 characters
+}

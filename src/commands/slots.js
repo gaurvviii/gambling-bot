@@ -71,15 +71,27 @@ export class SlotsCommand extends Command {
       });
 
       const symbols = ['🍒', '🍊', '🍋', '🍇', '💎', '7️⃣'];
+      const payouts = {
+        '7️⃣': 10,  // Jackpot
+        '💎': 7,    // High value
+        '🍇': 5,    // Medium value
+        '🍋': 4,    // Medium value
+        '🍊': 3,    // Low value
+        '🍒': 2     // Low value
+      };
+
       const result = Array(3)
         .fill(0)
         .map(() => symbols[Math.floor(Math.random() * symbols.length)]);
 
       let winnings = 0;
       if (result[0] === result[1] && result[1] === result[2]) {
-        winnings = bet * 5;
+        // Three matching symbols - multiply by symbol's payout value
+        winnings = bet * payouts[result[0]];
       } else if (result[0] === result[1] || result[1] === result[2]) {
-        winnings = bet * 2;
+        // Two matching symbols - multiply by half the symbol's payout value
+        const matchingSymbol = result[0] === result[1] ? result[0] : result[2];
+        winnings = bet * Math.ceil(payouts[matchingSymbol] / 2);
       }
 
       // Update balance based on result

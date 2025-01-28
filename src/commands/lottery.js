@@ -3,6 +3,7 @@ import { EmbedBuilder } from 'discord.js';
 import { prisma } from '../lib/database.js';
 import ROLE_IDS from '../config/roleIds.js';
 import { GAMBLING_CHANNEL_ID} from '../config/constants.js';
+import { generateShortId } from '../lib/lotteryManager.js'; 
 
 export class LotteryCommand extends Command {
     constructor(context, options) {
@@ -140,16 +141,20 @@ export class LotteryCommand extends Command {
         const ticketPrice = interaction.options.getInteger('ticket_price');
         const duration = interaction.options.getInteger('duration');
         const endTime = new Date(Date.now() + duration * 3600000);
-
+    
+        // Generate a short ID for the lottery
+        const lotteryId = generateShortId();
+    
         const lottery = await prisma.lottery.create({
             data: {
+                id: lotteryId,  // Set the generated short ID here
                 prize,
                 ticketPrice,
                 endTime,
                 active: true,
             },
         });
-
+    
         const embed = new EmbedBuilder()
             .setTitle('🎉 New Lottery Created!')
             .setColor('#00FF00')
@@ -161,7 +166,7 @@ export class LotteryCommand extends Command {
                 { name: 'Ends At', value: `<t:${Math.floor(endTime.getTime() / 1000)}:R>`, inline: true }
             )
             .setFooter({ text: 'Use /lottery buy to purchase tickets!' });
-
+    
         await interaction.editReply({ embeds: [embed] });
     }
 

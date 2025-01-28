@@ -27,17 +27,17 @@ model User {
 
 
 model Lottery {
-  id          String    @id @default(cuid())
+  id          String    @id @db.VarChar(5)  // Ensure id is stored as a string with max 5 characters
   prize       Int
   ticketPrice Int
-  endTime     DateTime  @db.Timestamp // End time of the lottery
+  endTime     DateTime  @db.Timestamp
   winner      String?
   active      Boolean   @default(true)
-  tickets     LotteryTicket[] // Associated tickets for the lottery
+  tickets     LotteryTicket[]
 }
 
 model LotteryTicket {
-  id        String   @id @default(cuid())
+  id        String   @id @db.VarChar(5)  // Ensure id is stored as a string with max 5 characters
   lotteryId String
   userId    String
   lottery   Lottery  @relation(fields: [lotteryId], references: [id])
