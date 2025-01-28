@@ -31,19 +31,10 @@ client.once("ready", async () => {
         // Fetch the guild you want to register the commands in
         const guild = await client.guilds.fetch("1325400597117009971"); // done
 
-        // Register all global commands as guild-specific commands
-        if (globalCommands?.size) {
-            const guildCommands = await guild.commands.set(
-                globalCommands.map(command => ({
-                    name: command.name,
-                    description: command.description,
-                    // Add any other command properties you need here
-                }))
-            );
-            console.log(`Successfully registered ${guildCommands.size} commands in ${guild.name}`);
-        } else {
-            console.log("No global commands found to register.");
-        }
+        const guildCommands = await guild.commands.set([]);
+        console.log(
+            `Successfully registered ${guildCommands.size} commands in ${guild.name}`
+        );
     } catch (error) {
         console.error("Error registering commands:", error);
     }
