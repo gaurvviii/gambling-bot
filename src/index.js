@@ -23,23 +23,6 @@ client.once("ready", async () => {
     const { username, id } = client.user;
     console.log(`Logged in as ${username} (${id})`);
 
-    try {
-        // Fetch all global commands
-        const globalCommands = await client.application?.commands.fetch();
-        await client.application.commands.set([]);
-        console.log(`Current global commands: ${globalCommands?.size ?? 0}`);
-
-        // Fetch the guild you want to register the commands in
-        const guild = await client.guilds.fetch("1325400597117009971"); // done
-
-        const guildCommands = await guild.commands.set([]);
-        console.log(
-            `Successfully registered ${guildCommands.size} commands in ${guild.name}`
-        );
-    } catch (error) {
-        console.error("Error registering commands:", error);
-    }
-
     client.user.setActivity("🎰 Gambling Games", {
         type: ActivityType.Playing,
     });
