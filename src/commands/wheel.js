@@ -10,6 +10,8 @@ const WHEEL_SEGMENTS = [
   { multiplier: 0.0, emoji: '💀' }, // Loss
   { multiplier: 0.0, emoji: '💀' }, // Loss
   { multiplier: 0.0, emoji: '💀' }, // Loss
+  { multiplier: 0.0, emoji: '💀' }, // Loss
+  { multiplier: 0.0, emoji: '💀' } // Loss
 ];
 
 export class WheelCommand extends Command {

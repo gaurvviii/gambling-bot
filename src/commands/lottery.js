@@ -186,20 +186,19 @@ export class LotteryCommand extends Command {
             return interaction.editReply('❌ This lottery has already been drawn.');
         }
 
-        if (lottery.endTime > new Date()) {
-            return interaction.editReply('❌ This lottery has not ended yet.');
-        }
-
         if (lottery.tickets.length === 0) {
             await prisma.lottery.update({
                 where: { id: lotteryId },
                 data: { active: false },
             });
-
             return interaction.editReply('❌ No tickets were purchased for this lottery. The lottery has been closed.');
         }
 
+        // Select winner and get their ticket count
         const winnerTicket = lottery.tickets[Math.floor(Math.random() * lottery.tickets.length)];
+        const winnerTicketCount = lottery.tickets.filter(ticket => ticket.userId === winnerTicket.userId).length;
+        const totalTickets = lottery.tickets.length;
+        const winChance = ((winnerTicketCount / totalTickets) * 100).toFixed(2);
 
         await prisma.$transaction([
             prisma.lottery.update({
@@ -211,19 +210,24 @@ export class LotteryCommand extends Command {
             }),
             prisma.user.update({
                 where: { id: winnerTicket.userId },
-                data: { wallet: { increment: lottery.prize } },
+                data: {
+                    wallet: { increment: lottery.prize },
+                    totalWon: { increment: lottery.prize }
+                },
             })
         ]);
 
         const embed = new EmbedBuilder()
-            .setTitle('🎉 Lottery Winner Drawn!')
+            .setTitle('🎉 Lottery Winner Drawn! 🎉')
             .setColor('#FFD700')
             .addFields(
                 { name: 'Lottery ID', value: lotteryId, inline: true },
-                { name: 'Prize', value: `${lottery.prize} coins`, inline: true },
-                { name: 'Winner', value: `<@${winnerTicket.userId}>`, inline: true },
-                { name: 'Total Tickets', value: `${lottery.tickets.length}`, inline: true }
-            );
+                { name: '💰 Prize Pool', value: `${lottery.prize} coins`, inline: true },
+                { name: '👑 Winner', value: `<@${winnerTicket.userId}>`, inline: true },
+                { name: '🎟️ Winner\'s Tickets', value: `${winnerTicketCount}/${totalTickets} (${winChance}% chance)`, inline: true },
+                { name: '📊 Total Entries', value: `${totalTickets} tickets`, inline: true }
+            )
+            .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });
     }

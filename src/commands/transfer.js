@@ -24,7 +24,7 @@ export class TransferCommand extends Command {
             .addChoices(
               { name: 'Wallet to Bank', value: 'toBank' },
               { name: 'Bank to Wallet', value: 'toWallet' },
-              { name: 'to other user', value: 'toUser' }
+              { name: 'To Other User', value: 'toUser' }
             )
         )
         .addIntegerOption((option) =>
