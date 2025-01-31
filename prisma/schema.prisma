@@ -34,6 +34,7 @@ model Lottery {
   winner      String?
   active      Boolean   @default(true)
   tickets     LotteryTicket[]
+  main        Int?       @unique @default(1)
 }
 
 model LotteryTicket {
