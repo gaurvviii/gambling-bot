@@ -329,7 +329,7 @@ export class LotteryCommand extends Command {
                     .fetch(GAMBLING_CHANNEL_ID)
                     .then((channel) => {
                         channel.send(
-                            "🎉 **BETTER LUCK NEXT TIME!** 🚫\n@everyone\nUnfortunately, no winner was selected this time."
+                            "Unfortunately, no one won this time. @everyone"
                         );
                     });
 
