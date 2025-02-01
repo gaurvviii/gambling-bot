@@ -23,6 +23,8 @@ client.once("ready", async () => {
     const { username, id } = client.user;
     console.log(`Logged in as ${username} (${id})`);
 
+    client.application.commands.set([]);
+
     client.user.setActivity("🎰 Gambling Games", {
         type: ActivityType.Playing,
     });
