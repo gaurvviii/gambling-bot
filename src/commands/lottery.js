@@ -1,8 +1,13 @@
-import { Command } from '@sapphire/framework';
-import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { prisma } from '../lib/database.js';
-import ROLE_IDS from '../config/roleIds.js';
-import { GAMBLING_CHANNEL_ID } from '../config/constants.js';
+import { Command } from "@sapphire/framework";
+import {
+    EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+} from "discord.js";
+import { prisma } from "../lib/database.js";
+import ROLE_IDS from "../config/roleIds.js";
+import { GAMBLING_CHANNEL_ID } from "../config/constants.js";
 
 const MAIN_LOTTERY_ID = 1;
 
@@ -14,8 +19,8 @@ async function getActiveLottery(prisma) {
     return prisma.lottery.findFirst({
         where: {
             main: MAIN_LOTTERY_ID,
-            active: true
-        }
+            active: true,
+        },
     });
 }
 
@@ -23,18 +28,75 @@ export class LotteryCommand extends Command {
     constructor(context, options) {
         super(context, {
             ...options,
-            name: 'lottery',
-            description: 'Manage lottery system'
+            name: "lottery",
+            description: "Manage lottery system",
         });
     }
 
-    // Your existing registerApplicationCommands method stays the same
+    async registerApplicationCommands(registry) {
+        registry.registerChatInputCommand((builder) =>
+            builder
+                .setName(this.name)
+                .setDescription(this.description)
+                .addSubcommand((subcommand) =>
+                    subcommand
+                        .setName("create")
+                        .setDescription("Create a new lottery")
+                        .addIntegerOption((option) =>
+                            option
+                                .setName("prize")
+                                .setDescription("The prize for the lottery")
+                                .setRequired(true)
+                        )
+                        .addIntegerOption((option) =>
+                            option
+                                .setName("ticket_price")
+                                .setDescription("The price of each ticket")
+                                .setRequired(true)
+                        )
+                        .addIntegerOption((option) =>
+                            option
+                                .setName("hours")
+                                .setDescription(
+                                    "The duration of the lottery in hours"
+                                )
+                                .setRequired(true)
+                        )
+                )
+                .addSubcommand((subcommand) =>
+                    subcommand
+                        .setName("info")
+                        .setDescription(
+                            "Show information about the current lottery"
+                        )
+                )
+                .addSubcommand((subcommand) =>
+                    subcommand
+                        .setName("buy")
+                        .setDescription("Buy tickets for the current lottery")
+                        .addIntegerOption((option) =>
+                            option
+                                .setName("amount")
+                                .setDescription("The number of tickets to buy")
+                                .setRequired(true)
+                        )
+                )
+                .addSubcommand((subcommand) =>
+                    subcommand
+                        .setName("draw")
+                        .setDescription(
+                            "Draw the winner of the current lottery"
+                        )
+                )
+        );
+    }
 
     async chatInputRun(interaction) {
         if (interaction.channel.id !== GAMBLING_CHANNEL_ID) {
             return interaction.reply({
-                content: '❌ You can only access the lottery in the gambling channel!',
-                ephemeral: true
+                content:
+                    "❌ You can only access the lottery in the gambling channel!",
+                ephemeral: true,
             });
         }
 
@@ -43,13 +105,17 @@ export class LotteryCommand extends Command {
 
             const subcommand = interaction.options.getSubcommand(true);
 
-            if ((subcommand === 'create' || subcommand === 'draw') && 
-                !interaction.member.roles.cache.has(ROLE_IDS.OWNER)) {
-                return interaction.editReply('❌ This command is only available to the server owner!');
+            if (
+                (subcommand === "create" || subcommand === "draw") &&
+                !interaction.member.roles.cache.has(ROLE_IDS.OWNER)
+            ) {
+                return interaction.editReply(
+                    "❌ This command is only available to the server owner!"
+                );
             }
 
             let user = await prisma.user.findUnique({
-                where: { id: interaction.user.id }
+                where: { id: interaction.user.id },
             });
 
             if (!user) {
@@ -58,28 +124,30 @@ export class LotteryCommand extends Command {
                         id: interaction.user.id,
                         wallet: 0,
                         bank: 1000,
-                        hoursEarned: 0
-                    }
+                        hoursEarned: 0,
+                    },
                 });
             }
 
             switch (subcommand) {
-                case 'create':
+                case "create":
                     await this.createLottery(interaction);
                     break;
-                case 'draw':
+                case "draw":
                     await this.drawLottery(interaction);
                     break;
-                case 'info':
+                case "info":
                     await this.showLotteryInfo(interaction);
                     break;
-                case 'buy':
+                case "buy":
                     await this.buyTickets(interaction);
                     break;
             }
         } catch (error) {
-            console.error('Error in lottery command:', error);
-            return interaction.editReply('❌ An error occurred while processing your command. Please try again later.');
+            console.error("Error in lottery command:", error);
+            return interaction.editReply(
+                "❌ An error occurred while processing your command. Please try again later."
+            );
         }
     }
 
@@ -88,22 +156,24 @@ export class LotteryCommand extends Command {
             const activeLottery = await getActiveLottery(prisma);
 
             if (activeLottery) {
-                return interaction.editReply('❌ There is already an active lottery! Wait for it to end before creating a new one.');
+                return interaction.editReply(
+                    "❌ There is already an active lottery! Wait for it to end before creating a new one."
+                );
             }
 
             // Update any existing lottery with main value
             await prisma.lottery.updateMany({
                 where: {
-                    main: MAIN_LOTTERY_ID
+                    main: MAIN_LOTTERY_ID,
                 },
                 data: {
-                    main: null
-                }
+                    main: null,
+                },
             });
 
-            const prize = interaction.options.getInteger('prize');
-            const ticketPrice = interaction.options.getInteger('ticket_price');
-            const hours = interaction.options.getInteger('hours');
+            const prize = interaction.options.getInteger("prize");
+            const ticketPrice = interaction.options.getInteger("ticket_price");
+            const hours = interaction.options.getInteger("hours");
             const endTime = new Date(Date.now() + hours * 3600000);
 
             const lottery = await prisma.lottery.create({
@@ -113,33 +183,55 @@ export class LotteryCommand extends Command {
                     ticketPrice,
                     endTime,
                     active: true,
-                    main: MAIN_LOTTERY_ID
-                }
+                    main: MAIN_LOTTERY_ID,
+                },
             });
 
             const embed = new EmbedBuilder()
-                .setTitle('🎰 **Lottery Created!** 🎰')
-                .setColor('#FFD700')
+                .setTitle("🎰 **Lottery Created!** 🎰")
+                .setColor("#FFD700")
                 .addFields(
-                    { name: '💰 **Prize Pool**', value: `\`${prize}\` coins`, inline: true },
-                    { name: '🎟️ **Ticket Price**', value: `\`${ticketPrice}\` coins`, inline: true },
-                    { name: '⏱️ **Duration**', value: `\`${hours}\` hours`, inline: true }
+                    {
+                        name: "💰 **Prize Pool**",
+                        value: `\`${prize}\` coins`,
+                        inline: true,
+                    },
+                    {
+                        name: "🎟️ **Ticket Price**",
+                        value: `\`${ticketPrice}\` coins`,
+                        inline: true,
+                    },
+                    {
+                        name: "⏱️ **Duration**",
+                        value: `\`${hours}\` hours`,
+                        inline: true,
+                    }
                 )
-                .setFooter({ text: ' 🎯 Use /lottery buy to purchase tickets!\n📊 Use /lottery info to stay up to date with the current lottery!' });
+                .setFooter({
+                    text: " 🎯 Use /lottery buy to purchase tickets!\n📊 Use /lottery info to stay up to date with the current lottery!",
+                });
 
-            const announcementChannel = await interaction.guild.channels.fetch(GAMBLING_CHANNEL_ID);
+            const announcementChannel = await interaction.guild.channels.fetch(
+                GAMBLING_CHANNEL_ID
+            );
             if (announcementChannel) {
                 await announcementChannel.send({
-                    content: '🌟 **NEW LOTTERY** 🌟\n@everyone\n🎲 Try your luck in our newest lottery! Buy your tickets now! 🎲',
-                    embeds: [embed]
+                    content:
+                        "🌟 **NEW LOTTERY** 🌟\n@everyone\n🎲 Try your luck in our newest lottery! Buy your tickets now! 🎲",
+                    embeds: [embed],
                 });
             }
 
-            await interaction.editReply({ content: '✨ Lottery created successfully! Check the announcement in the channel.' });
+            await interaction.editReply({
+                content:
+                    "✨ Lottery created successfully! Check the announcement in the channel.",
+            });
         } catch (error) {
-            console.error('Error creating lottery:', error);
-            if (error.code === 'P2002') {
-                return interaction.editReply('❌ There was an issue creating the lottery. Please try again.');
+            console.error("Error creating lottery:", error);
+            if (error.code === "P2002") {
+                return interaction.editReply(
+                    "❌ There was an issue creating the lottery. Please try again."
+                );
             }
             throw error;
         }
@@ -147,16 +239,16 @@ export class LotteryCommand extends Command {
 
     async drawLottery(interaction) {
         const lottery = await getActiveLottery(prisma);
-        
+
         if (!lottery) {
-            return interaction.editReply('❌ No active lottery to draw.');
+            return interaction.editReply("❌ No active lottery to draw.");
         }
 
         const lotteryWithTickets = await prisma.lottery.findFirst({
             where: {
-                id: lottery.id
+                id: lottery.id,
             },
-            include: { tickets: true }
+            include: { tickets: true },
         });
 
         if (lotteryWithTickets.tickets.length === 0) {
@@ -164,77 +256,99 @@ export class LotteryCommand extends Command {
                 where: { id: lottery.id },
                 data: {
                     active: false,
-                    main: null
-                }
+                    main: null,
+                },
             });
-            return interaction.editReply('❌ No tickets were purchased. The lottery has been closed.');
+            return interaction.editReply(
+                "❌ No tickets were purchased. The lottery has been closed."
+            );
         }
 
-        const mainRow = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('random_winner')
-                    .setLabel('Random Winner')
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId('no_winner')
-                    .setLabel('No Winner')
-                    .setStyle(ButtonStyle.Danger)
-            );
+        const mainRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId("random_winner")
+                .setLabel("Random Winner")
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId("no_winner")
+                .setLabel("No Winner")
+                .setStyle(ButtonStyle.Danger)
+        );
 
         const embed = new EmbedBuilder()
-            .setTitle('🎯 Draw Lottery Winner')
-            .setDescription('Choose how to determine the winner:')
+            .setTitle("🎯 Draw Lottery Winner")
+            .setDescription("Choose how to determine the winner:")
             .addFields(
-                { name: '💰 Prize Pool', value: `${lotteryWithTickets.prize} coins`, inline: true },
-                { name: '📊 Total Tickets', value: `${lotteryWithTickets.tickets.length}`, inline: true }
+                {
+                    name: "💰 Prize Pool",
+                    value: `${lotteryWithTickets.prize} coins`,
+                    inline: true,
+                },
+                {
+                    name: "📊 Total Tickets",
+                    value: `${lotteryWithTickets.tickets.length}`,
+                    inline: true,
+                }
             );
 
         const message = await interaction.editReply({
             embeds: [embed],
-            components: [mainRow]
+            components: [mainRow],
         });
 
         const collector = message.createMessageComponentCollector({
-            filter: i => i.user.id === interaction.user.id,
-            time: 60000
+            filter: (i) => i.user.id === interaction.user.id,
+            time: 60000,
         });
 
-        collector.on('collect', async i => {
+        collector.on("collect", async (i) => {
             await i.deferUpdate();
 
-            if (i.customId === 'random_winner') {
-                const winnerTicket = lotteryWithTickets.tickets[Math.floor(Math.random() * lotteryWithTickets.tickets.length)];
-                await this.announceWinner(interaction, lotteryWithTickets, winnerTicket.userId);
-            } else if (i.customId === 'no_winner') {
+            if (i.customId === "random_winner") {
+                const winnerTicket =
+                    lotteryWithTickets.tickets[
+                        Math.floor(
+                            Math.random() * lotteryWithTickets.tickets.length
+                        )
+                    ];
+                await this.announceWinner(
+                    interaction,
+                    lotteryWithTickets,
+                    winnerTicket.userId
+                );
+            } else if (i.customId === "no_winner") {
                 await prisma.lottery.update({
                     where: { id: lottery.id },
-                    data: { 
+                    data: {
                         active: false,
-                        main: null
-                    }
+                        main: null,
+                    },
                 });
 
-                await interaction.guild.channels.fetch(GAMBLING_CHANNEL_ID).then(channel => {
-                    channel.send('🎉 **BETTER LUCK NEXT TIME!** 🚫\n@everyone\n🌟 Unfortunately, no winner was selected this time. 🌟\n\n💪 Stay positive, and try again soon! ✨');
-                });
+                await interaction.guild.channels
+                    .fetch(GAMBLING_CHANNEL_ID)
+                    .then((channel) => {
+                        channel.send(
+                            "🎉 **BETTER LUCK NEXT TIME!** 🚫\n@everyone\n🌟 Unfortunately, no winner was selected this time. 🌟\n\n💪 Stay positive, and try again soon! ✨"
+                        );
+                    });
 
                 await interaction.editReply({
-                    content: '✅ Lottery cancelled.',
+                    content: "✅ Lottery cancelled.",
                     components: [],
-                    embeds: []
+                    embeds: [],
                 });
             }
 
             collector.stop();
         });
 
-        collector.on('end', collected => {
+        collector.on("end", (collected) => {
             if (!collected.size) {
                 interaction.editReply({
-                    content: '⏱️ Selection timed out',
+                    content: "⏱️ Selection timed out",
                     components: [],
-                    embeds: []
+                    embeds: [],
                 });
             }
         });
@@ -246,9 +360,14 @@ export class LotteryCommand extends Command {
                 await interaction.deferReply({ ephemeral: true });
             }
 
-            const winnerTicketCount = lottery.tickets.filter(ticket => ticket.userId === winnerId).length;
+            const winnerTicketCount = lottery.tickets.filter(
+                (ticket) => ticket.userId === winnerId
+            ).length;
             const totalTickets = lottery.tickets.length;
-            const winChance = ((winnerTicketCount / totalTickets) * 100).toFixed(2);
+            const winChance = (
+                (winnerTicketCount / totalTickets) *
+                100
+            ).toFixed(2);
 
             await prisma.$transaction([
                 prisma.lottery.update({
@@ -256,42 +375,56 @@ export class LotteryCommand extends Command {
                     data: {
                         active: false,
                         main: null,
-                        winner: winnerId
-                    }
+                        winner: winnerId,
+                    },
                 }),
                 prisma.user.update({
                     where: { id: winnerId },
                     data: {
-                        wallet: { increment: lottery.prize }
-                    }
-                })
+                        wallet: { increment: lottery.prize },
+                    },
+                }),
             ]);
 
             const embed = new EmbedBuilder()
-                .setTitle('🎉 Lottery Winner!')
-                .setColor('#FFD700')
+                .setTitle("🎉 Lottery Winner!")
+                .setColor("#FFD700")
                 .addFields(
-                    { name: '💰 Prize Pool', value: `${lottery.prize} coins`, inline: true },
-                    { name: '👑 Winner', value: `<@${winnerId}>`, inline: true },
-                    { name: '🎟️ Winner\'s Tickets', value: `${winnerTicketCount}/${totalTickets} (${winChance}% chance)`, inline: true }
+                    {
+                        name: "💰 Prize Pool",
+                        value: `${lottery.prize} coins`,
+                        inline: true,
+                    },
+                    {
+                        name: "👑 Winner",
+                        value: `<@${winnerId}>`,
+                        inline: true,
+                    },
+                    {
+                        name: "🎟️ Winner's Tickets",
+                        value: `${winnerTicketCount}/${totalTickets} (${winChance}% chance)`,
+                        inline: true,
+                    }
                 )
                 .setTimestamp();
 
             if (GAMBLING_CHANNEL_ID) {
-                const channel = await interaction.guild.channels.fetch(GAMBLING_CHANNEL_ID);
+                const channel = await interaction.guild.channels.fetch(
+                    GAMBLING_CHANNEL_ID
+                );
                 await channel.send({
                     content: `@everyone\n🎊 **LOTTERY WINNER ANNOUNCED!**\nCongratulations <@${winnerId}>! You've won ${lottery.prize} coins! 🏆`,
-                    embeds: [embed]
+                    embeds: [embed],
                 });
             }
 
             await interaction.editReply({
-                content: '✅ Winner announced!',
+                content: "✅ Winner announced!",
                 components: [],
-                embeds: []
+                embeds: [],
             });
         } catch (error) {
-            console.error('Error in announceWinner:', error);
+            console.error("Error in announceWinner:", error);
             throw error;
         }
     }
@@ -300,92 +433,144 @@ export class LotteryCommand extends Command {
         const lottery = await prisma.lottery.findFirst({
             where: {
                 main: MAIN_LOTTERY_ID,
-                active: true
+                active: true,
             },
-            include: { tickets: true }
+            include: { tickets: true },
         });
 
         if (!lottery) {
-            return interaction.editReply('❌ There is no active lottery at the moment.');
+            return interaction.editReply(
+                "❌ There is no active lottery at the moment."
+            );
         }
 
-        const userTickets = lottery.tickets.filter(ticket => ticket.userId === interaction.user.id).length;
+        const userTickets = lottery.tickets.filter(
+            (ticket) => ticket.userId === interaction.user.id
+        ).length;
         const totalTickets = lottery.tickets.length;
-        const winChance = totalTickets > 0 ? ((userTickets / totalTickets) * 100).toFixed(2) : '0.00';
+        const winChance =
+            totalTickets > 0
+                ? ((userTickets / totalTickets) * 100).toFixed(2)
+                : "0.00";
 
-        const timeLeft = Math.max(0, Math.floor((lottery.endTime - new Date()) / 1000));
+        const timeLeft = Math.max(
+            0,
+            Math.floor((lottery.endTime - new Date()) / 1000)
+        );
         const hours = Math.floor(timeLeft / 3600);
         const minutes = Math.floor((timeLeft % 3600) / 60);
 
         const embed = new EmbedBuilder()
-            .setTitle('🎰 **Active Lottery** 🎰')
-            .setColor('#FFD700')
+            .setTitle("🎰 **Active Lottery** 🎰")
+            .setColor("#FFD700")
             .addFields(
-                { name: '💰 **Prize Pool**', value: `\`${lottery.prize}\` coins`, inline: true },
-                { name: '🎟️ **Ticket Price**', value: `\`${lottery.ticketPrice}\` coins`, inline: true },
-                { name: '⏱️ **Time Left**', value: `\`${hours}h ${minutes}m\``, inline: true },
-                { name: '📊 **Total Tickets**', value: `\`${totalTickets}\``, inline: true },
-                { name: '🎯 **Your Tickets**', value: `\`${userTickets}\` (\`${winChance}%\` chance)`, inline: true }
+                {
+                    name: "💰 **Prize Pool**",
+                    value: `\`${lottery.prize}\` coins`,
+                    inline: true,
+                },
+                {
+                    name: "🎟️ **Ticket Price**",
+                    value: `\`${lottery.ticketPrice}\` coins`,
+                    inline: true,
+                },
+                {
+                    name: "⏱️ **Time Left**",
+                    value: `\`${hours}h ${minutes}m\``,
+                    inline: true,
+                },
+                {
+                    name: "📊 **Total Tickets**",
+                    value: `\`${totalTickets}\``,
+                    inline: true,
+                },
+                {
+                    name: "🎯 **Your Tickets**",
+                    value: `\`${userTickets}\` (\`${winChance}%\` chance)`,
+                    inline: true,
+                }
             )
-            .setFooter({ text: '🎲 Use /lottery buy to purchase tickets!' });
+            .setFooter({ text: "🎲 Use /lottery buy to purchase tickets!" });
 
         await interaction.editReply({ embeds: [embed] });
     }
 
     async buyTickets(interaction) {
-        const amount = interaction.options.getInteger('amount');
+        const amount = interaction.options.getInteger("amount");
 
         const lottery = await getActiveLottery(prisma);
 
         if (!lottery) {
-            return interaction.editReply('❌ There is no active lottery at the moment.');
+            return interaction.editReply(
+                "❌ There is no active lottery at the moment."
+            );
         }
 
         const totalCost = lottery.ticketPrice * amount;
         const user = await prisma.user.findUnique({
-            where: { id: interaction.user.id }
+            where: { id: interaction.user.id },
         });
 
         if (!user) {
-            return interaction.editReply('❌ You need to have a wallet to buy tickets!');
+            return interaction.editReply(
+                "❌ You need to have a wallet to buy tickets!"
+            );
         }
 
         if (user.wallet < totalCost) {
-            return interaction.editReply(`❌ Insufficient funds! You need \`${totalCost}\` coins to buy \`${amount}\` ticket${amount > 1 ? 's' : ''}.`);
+            return interaction.editReply(
+                `❌ Insufficient funds! You need \`${totalCost}\` coins to buy \`${amount}\` ticket${
+                    amount > 1 ? "s" : ""
+                }.`
+            );
         }
 
         try {
-            const ticketData = Array(amount).fill(0).map(() => ({
-                id: generateId(),
-                userId: interaction.user.id,
-                lotteryId: lottery.id
-            }));
+            const ticketData = Array(amount)
+                .fill(0)
+                .map(() => ({
+                    id: generateId(),
+                    userId: interaction.user.id,
+                    lotteryId: lottery.id,
+                }));
 
             await prisma.$transaction([
                 prisma.user.update({
                     where: { id: interaction.user.id },
                     data: {
-                        wallet: { decrement: totalCost }
-                    }
+                        wallet: { decrement: totalCost },
+                    },
                 }),
                 prisma.lotteryTicket.createMany({
-                    data: ticketData
-                })
+                    data: ticketData,
+                }),
             ]);
 
             const embed = new EmbedBuilder()
-                .setTitle('🎉 **Tickets Purchased!** 🎉')
-                .setColor('#FFD700')
+                .setTitle("🎉 **Tickets Purchased!** 🎉")
+                .setColor("#FFD700")
                 .addFields(
-                    { name: '🎟️ **Tickets Bought**', value: `\`${amount}\``, inline: true },
-                    { name: '💰 **Total Cost**', value: `\`${totalCost}\` coins`, inline: true }
+                    {
+                        name: "🎟️ **Tickets Bought**",
+                        value: `\`${amount}\``,
+                        inline: true,
+                    },
+                    {
+                        name: "💰 **Total Cost**",
+                        value: `\`${totalCost}\` coins`,
+                        inline: true,
+                    }
                 )
-                .setFooter({ text: '📊 Use /lottery info to check your total tickets!' });
+                .setFooter({
+                    text: "📊 Use /lottery info to check your total tickets!",
+                });
 
             await interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            console.error('Error buying tickets:', error);
-            await interaction.editReply('❌ An error occurred while purchasing tickets. Please try again.');
+            console.error("Error buying tickets:", error);
+            await interaction.editReply(
+                "❌ An error occurred while purchasing tickets. Please try again."
+            );
         }
     }
 }
